@@ -1,0 +1,147 @@
+services:
+  websocket-server:
+    build:
+      context: ./websocket_server
+      dockerfile: Dockerfile
+    image: websocket-server:latest
+    container_name: ws-server
+    ports:
+      - "443:443"
+      - "80:80"
+    environment:
+      - SERVER_ADDR=:443
+      - MESSAGE_RATE_LIMIT=10.0
+      - MESSAGE_BURST_LIMIT=20
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-here-minimum-16-chars}
+    volumes:
+      - ./data:/app/data
+      - ./certs:/app/certs:ro
+    networks:
+      - wsnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "--no-check-certificate", "https://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Client Peer 1 - Alice
+  client-alice:
+    build:
+      context: ./client-sdk
+      dockerfile: Dockerfile
+    image: websocket-client:latest
+    container_name: ws-client-alice
+    environment:
+      - WS_SERVER_URL=https://websocket-server:443
+      - WS_USER_ID=alice
+      - WS_USERNAME=Alice Smith
+      - WS_PRIVATE_KEY=${ALICE_PRIVATE_KEY:-}  # Set via .env file for persistence
+      - DEBUG=true
+      - INSECURE_TLS=true
+      - AUTO_ANNOUNCE=true
+    networks:
+      - wsnet
+    depends_on:
+      websocket-server:
+        condition: service_healthy
+    restart: "no"
+    stdin_open: true
+    tty: true
+    command: ["./simple-env-client"]
+
+  # Client Peer 2 - Bob
+  client-bob:
+    build:
+      context: ./client-sdk
+      dockerfile: Dockerfile
+    image: websocket-client:latest
+    container_name: ws-client-bob
+    environment:
+      - WS_SERVER_URL=https://websocket-server:443
+      - WS_USER_ID=bob
+      - WS_USERNAME=Bob Johnson
+      - WS_PRIVATE_KEY=${BOB_PRIVATE_KEY:-}  # Set via .env file for persistence
+      - DEBUG=true
+      - INSECURE_TLS=true
+      - AUTO_ANNOUNCE=true
+    networks:
+      - wsnet
+    depends_on:
+      websocket-server:
+        condition: service_healthy
+    restart: "no"
+    stdin_open: true
+    tty: true
+    command: ["./simple-env-client"]
+
+  # Client Peer 3 - Charlie (Environment-based Client)
+  client-charlie:
+    build:
+      context: ./client-sdk
+      dockerfile: Dockerfile
+    image: websocket-client:latest
+    container_name: ws-client-charlie
+    environment:
+      - WS_SERVER_URL=https://websocket-server:443
+      - WS_USER_ID=charlie
+      - WS_USERNAME=Charlie Davis
+      - WS_PRIVATE_KEY=${CHARLIE_PRIVATE_KEY:-}  # Set via .env file for persistence
+      - DEBUG=false
+      - INSECURE_TLS=true
+      - AUTO_ANNOUNCE=true
+    networks:
+      - wsnet
+    depends_on:
+      websocket-server:
+        condition: service_healthy
+    restart: "no"
+    stdin_open: true
+    tty: true
+    command: ["./simple-env-client"]
+
+  # Optional: Message Bot that sends periodic broadcasts
+  message-bot:
+    build:
+      context: ./client-sdk
+      dockerfile: Dockerfile
+    image: websocket-client:latest
+    container_name: ws-message-bot
+    environment:
+      - WS_SERVER_URL=https://websocket-server:443
+      - WS_USER_ID=bot
+      - WS_USERNAME=Message Bot
+      - WS_PRIVATE_KEY=${BOT_PRIVATE_KEY:-}  # Set via .env file for persistence
+      - DEBUG=false
+      - INSECURE_TLS=true
+      - AUTO_MODE=true  # Enable automated mode
+      - AUTO_ANNOUNCE=true
+    networks:
+      - wsnet
+    depends_on:
+      websocket-server:
+        condition: service_healthy
+      client-alice:
+        condition: service_started
+      client-bob:
+        condition: service_started
+      client-charlie:
+        condition: service_started
+    restart: "no"
+    stdin_open: false
+    tty: false
+    command: ["./simple-env-client"]
+
+networks:
+  wsnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+volumes:
+  data:
+    driver: local
+  certs:
+    driver: local
