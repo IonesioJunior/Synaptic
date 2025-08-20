@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION_MATRIX: '["1.20", "1.21", "1.22"]'
+  GO_VERSION_MATRIX: '["1.22", "1.23", "1.24"]'
 
 jobs:
   # =============================================================================
@@ -26,7 +26,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -103,7 +103,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -140,7 +140,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.20", "1.21", "1.22"]
+        go-version: ["1.22", "1.23", "1.24"]
         
     steps:
     - name: Checkout code
@@ -184,12 +184,60 @@ jobs:
         go test -v -race -timeout=10m ./...
         echo "::endgroup::"
 
+    - name: Build websocket_server for integration tests
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::Building WebSocket Server for Integration Tests"
+        go build -o websocket_server .
+        echo "::endgroup::"
+
+    - name: Generate self-signed certificates
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::Generating TLS Certificates"
+        openssl req -x509 -newkey rsa:4096 -keyout server.key -out server.crt -days 1 -nodes \
+          -subj "/C=US/ST=Test/L=Test/O=Test/CN=localhost"
+        echo "::endgroup::"
+
+    - name: Start websocket_server
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::Starting WebSocket Server"
+        DISABLE_HTTP_REDIRECT=true SERVER_ADDR=:8443 JWT_SECRET=test-secret-key-for-ci-testing ./websocket_server &
+        SERVER_PID=$!
+        echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+        
+        # Wait for server to be ready (max 30 seconds)
+        echo "Waiting for server to be ready..."
+        for i in {1..30}; do
+          if curl -k https://localhost:8443/health 2>/dev/null; then
+            echo "Server is ready!"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "Server failed to start within 30 seconds"
+            exit 1
+          fi
+          sleep 1
+        done
+        echo "::endgroup::"
+
     - name: Run integration tests
       working-directory: ./client-sdk
+      env:
+        TEST_WS_SERVER_URL: https://localhost:8443
       run: |
         echo "::group::Integration Tests"
         go test -v -race -timeout=15m -tags=integration ./...
         echo "::endgroup::"
+
+    - name: Stop websocket_server
+      if: always()
+      run: |
+        if [ ! -z "$SERVER_PID" ]; then
+          echo "Stopping websocket_server (PID: $SERVER_PID)"
+          kill $SERVER_PID || true
+        fi
 
   # =============================================================================
   # Performance Benchmarks
@@ -206,7 +254,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -248,7 +296,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
         
     - name: Cache Go modules
       uses: actions/cache@v4
@@ -307,7 +355,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.23'
         
     - name: Cache Go modules
       uses: actions/cache@v4

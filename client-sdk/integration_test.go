@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/genericwsserver/client-sdk/types"
+	"github.com/gorilla/websocket"
 )
 
 // These tests require a running WebSocket server
@@ -19,7 +20,7 @@ import (
 func getTestServerURL() string {
 	url := os.Getenv("TEST_WS_SERVER_URL")
 	if url == "" {
-		url = "http://localhost:443"
+		url = "https://localhost:8443"
 	}
 	return url
 }
@@ -31,6 +32,7 @@ func TestIntegrationConnect(t *testing.T) {
 		Username:      "Test User",
 		AutoReconnect: false,
 		Debug:         true,
+		InsecureTLS:   true,
 	}
 
 	client, err := NewClient(config)
@@ -65,17 +67,19 @@ func TestIntegrationConnect(t *testing.T) {
 func TestIntegrationMessageExchange(t *testing.T) {
 	// Create two clients
 	config1 := &Config{
-		ServerURL: getTestServerURL(),
-		UserID:    fmt.Sprintf("test-user1-%d", time.Now().Unix()),
-		Username:  "Test User 1",
-		Debug:     true,
+		ServerURL:   getTestServerURL(),
+		UserID:      fmt.Sprintf("test-user1-%d", time.Now().Unix()),
+		Username:    "Test User 1",
+		Debug:       true,
+		InsecureTLS: true,
 	}
 
 	config2 := &Config{
-		ServerURL: getTestServerURL(),
-		UserID:    fmt.Sprintf("test-user2-%d", time.Now().Unix()),
-		Username:  "Test User 2",
-		Debug:     true,
+		ServerURL:   getTestServerURL(),
+		UserID:      fmt.Sprintf("test-user2-%d", time.Now().Unix()),
+		Username:    "Test User 2",
+		Debug:       true,
+		InsecureTLS: true,
 	}
 
 	client1, err := NewClient(config1)
@@ -145,10 +149,11 @@ func TestIntegrationBroadcast(t *testing.T) {
 	// Create clients
 	for i := 0; i < numClients; i++ {
 		configs[i] = &Config{
-			ServerURL: getTestServerURL(),
-			UserID:    fmt.Sprintf("test-broadcast-%d-%d", i, time.Now().Unix()),
-			Username:  fmt.Sprintf("Broadcast User %d", i),
-			Debug:     false,
+			ServerURL:   getTestServerURL(),
+			UserID:      fmt.Sprintf("test-broadcast-%d-%d", i, time.Now().Unix()),
+			Username:    fmt.Sprintf("Broadcast User %d", i),
+			Debug:       false,
+			InsecureTLS: true,
 		}
 
 		var err error
@@ -219,6 +224,7 @@ func TestIntegrationReconnection(t *testing.T) {
 		AutoReconnect:    true,
 		MaxReconnectWait: 5 * time.Second,
 		Debug:            true,
+		InsecureTLS:      true,
 	}
 
 	client, err := NewClient(config)
@@ -227,12 +233,21 @@ func TestIntegrationReconnection(t *testing.T) {
 	}
 	defer client.Disconnect()
 
+	// Track connection events
+	connectCount := 0
 	reconnected := make(chan bool, 1)
-	client.OnReconnect(func(attempt int) {
-		t.Logf("Reconnection attempt %d", attempt)
-		if attempt > 0 {
+	
+	client.OnConnect(func() {
+		connectCount++
+		t.Logf("Connection established (count: %d)", connectCount)
+		if connectCount > 1 {
+			// This is a reconnection
 			reconnected <- true
 		}
+	})
+	
+	client.OnReconnect(func(attempt int) {
+		t.Logf("Reconnection attempt %d scheduled", attempt)
 	})
 
 	// Connect initially
@@ -240,36 +255,48 @@ func TestIntegrationReconnection(t *testing.T) {
 		t.Fatalf("Failed to connect: %v", err)
 	}
 
+	// Wait for initial connection to establish
+	time.Sleep(100 * time.Millisecond)
+	
 	if !client.IsConnected() {
 		t.Fatal("Client should be connected")
 	}
 
-	// Force disconnect by closing the connection
+	// Force disconnect by simulating network failure
+	// Send a close message to cleanly disconnect from server's perspective
 	client.connLock.Lock()
 	if client.conn != nil {
+		// Send close frame with normal closure code
+		client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		time.Sleep(100 * time.Millisecond) // Give server time to process close
 		client.conn.Close()
 	}
 	client.connLock.Unlock()
+	
+	// Give the client time to detect disconnection and trigger reconnection
+	time.Sleep(200 * time.Millisecond)
 
-	// Wait for reconnection
+	// Wait for reconnection to complete (not just be scheduled)
 	select {
 	case <-reconnected:
-		// Wait a bit for connection to stabilize
+		// Give a moment for state to stabilize
 		time.Sleep(500 * time.Millisecond)
 		if !client.IsConnected() {
 			t.Error("Client should be reconnected")
 		}
-	case <-time.After(10 * time.Second):
+		t.Log("Reconnection successful")
+	case <-time.After(15 * time.Second):
 		t.Fatal("Timeout waiting for reconnection")
 	}
 }
 
 func TestIntegrationMetrics(t *testing.T) {
 	config := &Config{
-		ServerURL: getTestServerURL(),
-		UserID:    fmt.Sprintf("test-metrics-%d", time.Now().Unix()),
-		Username:  "Metrics User",
-		Debug:     false,
+		ServerURL:   getTestServerURL(),
+		UserID:      fmt.Sprintf("test-metrics-%d", time.Now().Unix()),
+		Username:    "Metrics User",
+		Debug:       false,
+		InsecureTLS: true,
 	}
 
 	client, err := NewClient(config)
@@ -319,6 +346,7 @@ func TestIntegrationStressTest(t *testing.T) {
 			MessageBufferSize: 100,
 			Workers:           5,
 			Debug:             false,
+			InsecureTLS:       true,
 		}
 
 		var err error

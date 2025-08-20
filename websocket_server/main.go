@@ -80,13 +80,19 @@ func main() {
 		}
 	}()
 
-	// Start the HTTP server in another goroutine.
-	go func() {
-		log.Printf("Starting HTTP server on %s (redirecting to HTTPS)", httpSrv.Addr)
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server error: %v", err)
-		}
-	}()
+	// Start the HTTP server in another goroutine (unless disabled for testing).
+	if os.Getenv("DISABLE_HTTP_REDIRECT") != "true" {
+		go func() {
+			log.Printf("Starting HTTP server on %s (redirecting to HTTPS)", httpSrv.Addr)
+			if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("HTTP server error (non-fatal): %v", err)
+				// Don't use log.Fatalf here as it would kill the entire process
+				// The HTTPS server can still run without the HTTP redirect
+			}
+		}()
+	} else {
+		log.Println("HTTP redirect server disabled by DISABLE_HTTP_REDIRECT=true")
+	}
 
 	// Wait for termination signal to gracefully shutdown both servers.
 	quit := make(chan os.Signal, 1)
@@ -100,8 +106,10 @@ func main() {
 	if err := httpsSrv.Shutdown(ctx); err != nil {
 		log.Fatalf("HTTPS server forced to shutdown: %v", err)
 	}
-	if err := httpSrv.Shutdown(ctx); err != nil {
-		log.Fatalf("HTTP server forced to shutdown: %v", err)
+	if os.Getenv("DISABLE_HTTP_REDIRECT") != "true" {
+		if err := httpSrv.Shutdown(ctx); err != nil {
+			log.Printf("HTTP server shutdown error: %v", err)
+		}
 	}
 	log.Println("Servers shut down successfully")
 }

@@ -1,6 +1,6 @@
 module server-messages-example
 
-go 1.21
+go 1.23
 
 replace websocketserver => ../../../../websocket_server
 
