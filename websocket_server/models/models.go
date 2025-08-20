@@ -26,8 +26,8 @@ const (
 type MessageHeader struct {
 	From            string      `json:"from"`
 	To              string      `json:"to"`
-	MessageType     MessageType `json:"message_type"`               // Required: "direct", "broadcast", or "server"
-	IsBroadcast     bool        `json:"is_broadcast,omitempty"`     // Deprecated: use MessageType instead
+	MessageType     MessageType `json:"message_type"`           // Required: "direct", "broadcast", or "server"
+	IsBroadcast     bool        `json:"is_broadcast,omitempty"` // Deprecated: use MessageType instead
 	Timestamp       time.Time   `json:"timestamp"`
 	Signature       string      `json:"signature,omitempty"`        // Base64-encoded signature, required for server messages
 	EncryptedKey    string      `json:"encrypted_key,omitempty"`    // Base64 encoded encrypted AES key (for E2E encryption)
@@ -49,8 +49,8 @@ type Message struct {
 
 // ServerCommand represents a command sent to the server for processing
 type ServerCommand struct {
-	Command   string          `json:"command"`             // The command to execute
-	Params    json.RawMessage `json:"params,omitempty"`    // Command-specific parameters
+	Command   string          `json:"command"`              // The command to execute
+	Params    json.RawMessage `json:"params,omitempty"`     // Command-specific parameters
 	RequestID string          `json:"request_id,omitempty"` // Optional ID for tracking responses
 }
 
@@ -58,6 +58,6 @@ type ServerCommand struct {
 type ServerResponse struct {
 	Success   bool        `json:"success"`
 	RequestID string      `json:"request_id,omitempty"` // Original request ID for correlation
-	Result    interface{} `json:"result,omitempty"`      // Result data if successful
-	Error     string      `json:"error,omitempty"`       // Error message if failed
+	Result    interface{} `json:"result,omitempty"`     // Result data if successful
+	Error     string      `json:"error,omitempty"`      // Error message if failed
 }

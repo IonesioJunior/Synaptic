@@ -43,9 +43,9 @@ func TestUser(t *testing.T) {
 
 func TestMessageType(t *testing.T) {
 	tests := []struct {
-		name         string
-		messageType  MessageType
-		expectedStr  string
+		name        string
+		messageType MessageType
+		expectedStr string
 	}{
 		{
 			name:        "Direct message type",
@@ -317,7 +317,7 @@ func TestServerCommand(t *testing.T) {
 	var originalParams, unmarshaledParams map[string]interface{}
 	json.Unmarshal(command.Params, &originalParams)
 	json.Unmarshal(unmarshaledCommand.Params, &unmarshaledParams)
-	
+
 	if originalParams["param1"] != unmarshaledParams["param1"] {
 		t.Errorf("Param1 mismatch: expected %v, got %v", originalParams["param1"], unmarshaledParams["param1"])
 	}
@@ -417,7 +417,7 @@ func TestComplexMessageFlow(t *testing.T) {
 		ID: 456,
 		Header: MessageHeader{
 			From:            "user123",
-			To:              "user456", 
+			To:              "user456",
 			MessageType:     MessageTypeServer,
 			IsBroadcast:     false,
 			Timestamp:       now,
@@ -542,7 +542,7 @@ func TestMessageValidation(t *testing.T) {
 
 			// Verify the message type consistency
 			if unmarshaledMessage.Header.MessageType != tt.messageType {
-				t.Errorf("MessageType mismatch after marshal/unmarshal: expected %s, got %s", 
+				t.Errorf("MessageType mismatch after marshal/unmarshal: expected %s, got %s",
 					tt.messageType, unmarshaledMessage.Header.MessageType)
 			}
 		})

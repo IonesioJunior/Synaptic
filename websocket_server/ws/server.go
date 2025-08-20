@@ -5,15 +5,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
-	"math/rand"
 	"net/http"
 	"sync"
 	"time"
 	"websocketserver/auth"
 	"websocketserver/metrics"
 	"websocketserver/models"
+
+	"github.com/gorilla/websocket"
 )
 
 // getUpgrader returns a WebSocket upgrader with proper origin checking.
@@ -45,10 +45,10 @@ func (s *Server) getUpgrader() websocket.Upgrader {
 type Server struct {
 	db             *sql.DB
 	authService    *auth.Service
-	clients        map[string]*Client            // mapping from user_id to client connection
-	RateLimiter    *RateLimiter                  // rate limiter for message processing
-	serverHandlers *ServerMessageRegistry        // registry for server message handlers
-	allowedOrigins []string                      // list of allowed origins (empty = allow all)
+	clients        map[string]*Client     // mapping from user_id to client connection
+	RateLimiter    *RateLimiter           // rate limiter for message processing
+	serverHandlers *ServerMessageRegistry // registry for server message handlers
+	allowedOrigins []string               // list of allowed origins (empty = allow all)
 	mu             sync.RWMutex
 }
 
@@ -537,13 +537,4 @@ func (c *Client) writePump() {
 			return
 		}
 	}
-}
-
-// exponentialBackoff is an example function to simulate reconnection backoff with jitter.
-func exponentialBackoff(base, max time.Duration) time.Duration {
-	jitter := time.Duration(float64(base) * (0.5 + 0.5*rand.Float64()))
-	if jitter > max {
-		return max
-	}
-	return jitter
 }

@@ -72,7 +72,7 @@ type PingHandler struct{}
 
 func (h *PingHandler) Handle(ctx context.Context, server *Server, sender string, params json.RawMessage) (interface{}, error) {
 	return map[string]interface{}{
-		"message": "pong",
+		"message":   "pong",
 		"timestamp": time.Now().Unix(),
 	}, nil
 }
@@ -88,7 +88,7 @@ func (h *EchoHandler) Handle(ctx context.Context, server *Server, sender string,
 		}
 	}
 	return map[string]interface{}{
-		"echo": data,
+		"echo":   data,
 		"sender": sender,
 	}, nil
 }
@@ -102,9 +102,9 @@ func (h *ServerInfoHandler) Handle(ctx context.Context, server *Server, sender s
 	server.mu.RUnlock()
 
 	return map[string]interface{}{
-		"version": "1.0.0",
+		"version":         "1.0.0",
 		"connected_users": connectedUsers,
-		"timestamp": time.Now().Unix(),
+		"timestamp":       time.Now().Unix(),
 	}, nil
 }
 
@@ -117,7 +117,7 @@ func (h *UserCountHandler) Handle(ctx context.Context, server *Server, sender st
 	server.mu.RUnlock()
 
 	return map[string]interface{}{
-		"count": count,
+		"count":     count,
 		"timestamp": time.Now().Unix(),
 	}, nil
 }
@@ -129,7 +129,7 @@ func (h *ListCommandsHandler) Handle(ctx context.Context, server *Server, sender
 	commands := server.serverHandlers.List()
 	return map[string]interface{}{
 		"commands": commands,
-		"count": len(commands),
+		"count":    len(commands),
 	}, nil
 }
 

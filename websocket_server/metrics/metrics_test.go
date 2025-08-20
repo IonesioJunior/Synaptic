@@ -237,9 +237,9 @@ func TestGetWeeklyActiveUsers(t *testing.T) {
 	weekAgo := now.AddDate(0, 0, -7)
 
 	weeklyActiveUsers.Lock()
-	weeklyActiveUsers.m["user1"] = now.AddDate(0, 0, -1)  // 1 day ago (should count)
-	weeklyActiveUsers.m["user2"] = now.AddDate(0, 0, -6)  // 6 days ago (should count)
-	weeklyActiveUsers.m["user3"] = now.AddDate(0, 0, -8)  // 8 days ago (should not count)
+	weeklyActiveUsers.m["user1"] = now.AddDate(0, 0, -1)      // 1 day ago (should count)
+	weeklyActiveUsers.m["user2"] = now.AddDate(0, 0, -6)      // 6 days ago (should count)
+	weeklyActiveUsers.m["user3"] = now.AddDate(0, 0, -8)      // 8 days ago (should not count)
 	weeklyActiveUsers.m["user4"] = weekAgo.Add(1 * time.Hour) // Just within week (should count)
 	weeklyActiveUsers.Unlock()
 
@@ -285,9 +285,9 @@ func TestCalculateChurnRate(t *testing.T) {
 
 	// Set up last seen data
 	lastSeen.Lock()
-	lastSeen.m["user1"] = now.Add(-1 * time.Hour)  // Active recently (not churned)
-	lastSeen.m["user2"] = now.Add(-2 * time.Hour)  // Active recently (not churned)
-	lastSeen.m["user3"] = now.Add(-8 * 24 * time.Hour) // Churned (8 days ago)
+	lastSeen.m["user1"] = now.Add(-1 * time.Hour)       // Active recently (not churned)
+	lastSeen.m["user2"] = now.Add(-2 * time.Hour)       // Active recently (not churned)
+	lastSeen.m["user3"] = now.Add(-8 * 24 * time.Hour)  // Churned (8 days ago)
 	lastSeen.m["user4"] = now.Add(-10 * 24 * time.Hour) // Churned (10 days ago)
 	lastSeen.Unlock()
 
@@ -446,7 +446,7 @@ func TestMetricsDataRaces(t *testing.T) {
 // Benchmark tests
 func BenchmarkRecordSessionStart(b *testing.B) {
 	clearMetrics()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sessionID := fmt.Sprintf("bench-session-%d", i)
@@ -540,4 +540,3 @@ func clearMetrics() {
 	sessionDurations.m = make(map[string][]time.Duration)
 	sessionDurations.Unlock()
 }
-

@@ -208,11 +208,11 @@ func TestGetEnvInt(t *testing.T) {
 func TestLoadConfig(t *testing.T) {
 	// Save original environment
 	originalEnv := map[string]string{
-		"SERVER_ADDR":          os.Getenv("SERVER_ADDR"),
-		"MESSAGE_RATE_LIMIT":   os.Getenv("MESSAGE_RATE_LIMIT"),
-		"MESSAGE_BURST_LIMIT":  os.Getenv("MESSAGE_BURST_LIMIT"),
-		"ALLOWED_ORIGINS":      os.Getenv("ALLOWED_ORIGINS"),
-		"SECURITY_LOG_FILE":    os.Getenv("SECURITY_LOG_FILE"),
+		"SERVER_ADDR":         os.Getenv("SERVER_ADDR"),
+		"MESSAGE_RATE_LIMIT":  os.Getenv("MESSAGE_RATE_LIMIT"),
+		"MESSAGE_BURST_LIMIT": os.Getenv("MESSAGE_BURST_LIMIT"),
+		"ALLOWED_ORIGINS":     os.Getenv("ALLOWED_ORIGINS"),
+		"SECURITY_LOG_FILE":   os.Getenv("SECURITY_LOG_FILE"),
 	}
 
 	// Clean up environment variables
@@ -305,8 +305,8 @@ func TestLoadConfig(t *testing.T) {
 			},
 			expected: &Config{
 				ServerAddr:        ":443",
-				MessageRateLimit:  5.0,  // Should use default
-				MessageBurstLimit: 10,   // Should use default
+				MessageRateLimit:  5.0, // Should use default
+				MessageBurstLimit: 10,  // Should use default
 				AllowedOrigins:    nil,
 				SecurityLogFile:   "",
 			},

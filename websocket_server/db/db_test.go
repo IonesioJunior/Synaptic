@@ -86,7 +86,7 @@ func TestRunMigrations(t *testing.T) {
 	// Verify all tables were created
 	expectedTables := []string{
 		"users",
-		"messages", 
+		"messages",
 		"broadcast_deliveries",
 		"sessions",
 		"message_events",
@@ -144,7 +144,7 @@ func TestMigrationsTableStructure(t *testing.T) {
 			var name, dataType string
 			var notNull, pk int
 			var defaultValue sql.NullString
-			
+
 			err = rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &pk)
 			if err != nil {
 				t.Fatalf("Failed to scan column info: %v", err)
@@ -165,7 +165,7 @@ func TestMigrationsTableStructure(t *testing.T) {
 	// Test messages table structure
 	t.Run("MessagesTable", func(t *testing.T) {
 		expectedColumns := []string{
-			"id", "from_user", "to_user", "timestamp", "content", 
+			"id", "from_user", "to_user", "timestamp", "content",
 			"status", "is_broadcast", "message_type", "signature",
 		}
 

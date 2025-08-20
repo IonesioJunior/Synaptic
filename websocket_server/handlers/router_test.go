@@ -49,7 +49,7 @@ func TestSetupRoutes(t *testing.T) {
 			description:    "Should require authentication token",
 		},
 		{
-			name:           "Active users endpoint", 
+			name:           "Active users endpoint",
 			method:         "GET",
 			path:           "/active-users",
 			expectedStatus: http.StatusOK, // Should work with proper mock setup
@@ -123,7 +123,7 @@ func TestSetupRoutes(t *testing.T) {
 			mux.ServeHTTP(w, req)
 
 			if w.Code != tt.expectedStatus {
-				t.Errorf("Expected status %d, got %d for %s %s. Description: %s", 
+				t.Errorf("Expected status %d, got %d for %s %s. Description: %s",
 					tt.expectedStatus, w.Code, tt.method, tt.path, tt.description)
 			}
 		})
@@ -315,7 +315,7 @@ func TestStaticFileHandling(t *testing.T) {
 			mux.ServeHTTP(w, req)
 
 			if w.Code != tt.expectedCode {
-				t.Errorf("Expected status %d, got %d for %s. Description: %s", 
+				t.Errorf("Expected status %d, got %d for %s. Description: %s",
 					tt.expectedCode, w.Code, tt.path, tt.description)
 			}
 		})
@@ -361,7 +361,7 @@ func TestRouteIntegration(t *testing.T) {
 			routes:   []string{"/auth/register", "/auth/login", "/auth/check-userid/test", "/auth/users/test"},
 		},
 		{
-			category: "Static", 
+			category: "Static",
 			routes:   []string{"/static/"}, // Directory request should be handled
 		},
 	}
@@ -398,7 +398,7 @@ func TestNilParameterHandling(t *testing.T) {
 
 	// This should not panic, even though it might not work correctly
 	mux := http.NewServeMux()
-	
+
 	// Test with nil parameters - should not crash
 	// Note: This might not work correctly but shouldn't panic
 	db, mock, _ := sqlmock.New()

@@ -65,10 +65,7 @@ func main() {
 		Addr: ":80", // Standard HTTP port
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Remove the default port if it's present in the host
-			host := r.Host
-			if strings.HasSuffix(host, ":80") {
-				host = strings.TrimSuffix(host, ":80")
-			}
+			host := strings.TrimSuffix(r.Host, ":80")
 			target := "https://" + host + r.URL.RequestURI()
 			// Use StatusPermanentRedirect (308) to indicate that the resource has permanently moved.
 			http.Redirect(w, r, target, http.StatusPermanentRedirect)

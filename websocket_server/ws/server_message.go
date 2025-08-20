@@ -62,7 +62,7 @@ func (s *Server) processServerMessage(client *Client, msg models.Message) {
 
 		// Execute the handler
 		result, err := handler.Handle(ctx, s, client.userID, cmd.Params)
-		
+
 		// Send response
 		if err != nil {
 			s.sendServerError(client, msg, err.Error(), cmd.RequestID)

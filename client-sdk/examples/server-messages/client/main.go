@@ -16,7 +16,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
-	"golang.org/x/crypto/ed25519"
 )
 
 // Message structures
@@ -77,8 +76,8 @@ func NewExampleClient(userID, serverURL string) (*ExampleClient, error) {
 
 func (c *ExampleClient) Register() error {
 	// Register user
-	regURL := c.serverURL + "/auth/register"
-	
+	// regURL := c.serverURL + "/auth/register"
+
 	payload := map[string]string{
 		"user_id":    c.userID,
 		"username":   c.userID,
@@ -86,26 +85,26 @@ func (c *ExampleClient) Register() error {
 	}
 
 	payloadJSON, _ := json.Marshal(payload)
-	
+
 	fmt.Printf("Registering user %s...\n", c.userID)
 	fmt.Printf("Registration payload: %s\n", string(payloadJSON))
-	
+
 	// In a real implementation, you'd make an HTTP POST request
 	// For this example, we'll assume registration is successful
 	fmt.Printf("✓ User %s registered successfully\n\n", c.userID)
-	
+
 	return nil
 }
 
 func (c *ExampleClient) Login() error {
 	fmt.Printf("Logging in user %s...\n", c.userID)
-	
+
 	// In a real implementation, you'd:
 	// 1. Request challenge from /auth/login
 	// 2. Sign the challenge with your private key
 	// 3. Send signature to /auth/login?verify=true
 	// 4. Receive JWT token
-	
+
 	// For this example, we'll create a mock JWT token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": c.userID,
@@ -120,7 +119,7 @@ func (c *ExampleClient) Login() error {
 
 	c.token = tokenString
 	fmt.Printf("✓ Login successful for %s\n\n", c.userID)
-	
+
 	return nil
 }
 
@@ -156,7 +155,7 @@ func (c *ExampleClient) Connect() error {
 
 func (c *ExampleClient) readMessages() {
 	defer c.conn.Close()
-	
+
 	for {
 		_, data, err := c.conn.ReadMessage()
 		if err != nil {
@@ -286,7 +285,7 @@ func main() {
 	}
 
 	userID := "demo_user_" + strconv.FormatInt(time.Now().Unix(), 10)
-	
+
 	fmt.Println("=== WebSocket Server Message Example ===")
 	fmt.Printf("Server: %s\n", serverURL)
 	fmt.Printf("User ID: %s\n\n", userID)
@@ -322,7 +321,7 @@ func main() {
 	}
 	cmdJSON, _ := json.Marshal(cmd)
 	signature := ed25519.Sign(client.privateKey, cmdJSON)
-	
+
 	msg := Message{
 		Header: MessageHeader{
 			From:        userID,
@@ -351,7 +350,7 @@ func main() {
 	}
 	cmdJSON, _ = json.Marshal(cmd)
 	signature = ed25519.Sign(client.privateKey, cmdJSON)
-	
+
 	msg = Message{
 		Header: MessageHeader{
 			From:        userID,
@@ -379,7 +378,7 @@ func main() {
 	}
 	cmdJSON, _ = json.Marshal(cmd)
 	signature = ed25519.Sign(client.privateKey, cmdJSON)
-	
+
 	msg = Message{
 		Header: MessageHeader{
 			From:        userID,

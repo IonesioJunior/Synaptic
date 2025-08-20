@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/gorilla/websocket"
 	"websocketserver/auth"
 	"websocketserver/models"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/gorilla/websocket"
 )
 
 // MockConn implements a mock websocket.Conn for testing
@@ -277,15 +278,15 @@ func TestRetrieveUndeliveredMessages(t *testing.T) {
 		WithArgs("user1").
 		WillReturnRows(sqlmock.NewRows([]string{"created_at"}).AddRow(createdAt))
 
-	// Set up query results
+	// Set up query results - now includes message_type column
 	rows := sqlmock.NewRows([]string{
-		"id", "from_user", "to_user", "timestamp", "content", "status", "is_broadcast", "signature",
+		"id", "from_user", "to_user", "timestamp", "content", "status", "is_broadcast", "signature", "message_type",
 	}).
-		AddRow(1, "user2", "user1", time.Now(), "Direct message", "pending", false, "").
-		AddRow(2, "user3", "broadcast", time.Now(), "Broadcast message", "pending", true, "")
+		AddRow(1, "user2", "user1", time.Now(), "Direct message", "pending", false, "", "direct").
+		AddRow(2, "user3", "broadcast", time.Now(), "Broadcast message", "pending", true, "", "broadcast")
 
-	// Expect the query for undelivered messages
-	mock.ExpectQuery(`SELECT m\.id, m\.from_user, m\.to_user, m\.timestamp, m\.content, m\.status, m\.is_broadcast, m\.signature FROM messages m LEFT JOIN broadcast_deliveries bd ON m\.id = bd\.message_id AND bd\.user_id = \? WHERE`).
+	// Expect the query for undelivered messages - updated to include message_type
+	mock.ExpectQuery(`SELECT m\.id, m\.from_user, m\.to_user, m\.timestamp, m\.content, m\.status, m\.is_broadcast, m\.signature, COALESCE\(m\.message_type, 'direct'\) FROM messages m LEFT JOIN broadcast_deliveries bd ON m\.id = bd\.message_id AND bd\.user_id = \? WHERE`).
 		WithArgs("user1", "user1", createdAt).
 		WillReturnRows(rows)
 

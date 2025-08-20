@@ -136,11 +136,9 @@ func main() {
 		fmt.Println("Running in auto mode - sending periodic messages")
 		// Send a message every 30 seconds
 		for {
-			select {
-			case <-time.After(30 * time.Second):
-				msg := fmt.Sprintf("Auto message from %s at %s", username, time.Now().Format("15:04:05"))
-				c.Broadcast(msg)
-			}
+			time.Sleep(30 * time.Second)
+			msg := fmt.Sprintf("Auto message from %s at %s", username, time.Now().Format("15:04:05"))
+			c.Broadcast(msg)
 		}
 	}
 

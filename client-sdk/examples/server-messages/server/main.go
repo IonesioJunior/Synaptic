@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -28,14 +27,14 @@ type CustomStatusHandler struct {
 func (h *CustomStatusHandler) Handle(ctx context.Context, server *ws.Server, sender string, params json.RawMessage) (interface{}, error) {
 	// Calculate uptime
 	uptime := time.Since(h.startTime)
-	
+
 	// Get memory stats (simplified example)
 	return map[string]interface{}{
-		"status": "healthy",
+		"status":         "healthy",
 		"uptime_seconds": int(uptime.Seconds()),
-		"uptime_human": uptime.String(),
-		"sender": sender,
-		"timestamp": time.Now().Unix(),
+		"uptime_human":   uptime.String(),
+		"sender":         sender,
+		"timestamp":      time.Now().Unix(),
 	}, nil
 }
 
@@ -46,7 +45,7 @@ func (h *UserListHandler) Handle(ctx context.Context, server *ws.Server, sender 
 	// This is a simplified example - in production you'd want proper access to server internals
 	// For now, we'll return a mock response
 	return map[string]interface{}{
-		"users": []string{sender}, // In real implementation, get from server.clients
+		"users":     []string{sender}, // In real implementation, get from server.clients
 		"requester": sender,
 	}, nil
 }
@@ -85,9 +84,9 @@ func (h *MathHandler) Handle(ctx context.Context, server *ws.Server, sender stri
 
 	return map[string]interface{}{
 		"operation": mathParams.Operation,
-		"a": mathParams.A,
-		"b": mathParams.B,
-		"result": result,
+		"a":         mathParams.A,
+		"b":         mathParams.B,
+		"result":    result,
 	}, nil
 }
 
@@ -120,9 +119,9 @@ func (h *EchoDelayedHandler) Handle(ctx context.Context, server *ws.Server, send
 
 	return map[string]interface{}{
 		"echoed_message": echoParams.Message,
-		"delay_ms": echoParams.Delay,
-		"sender": sender,
-		"timestamp": time.Now().Unix(),
+		"delay_ms":       echoParams.Delay,
+		"sender":         sender,
+		"timestamp":      time.Now().Unix(),
 	}, nil
 }
 
@@ -131,7 +130,7 @@ func main() {
 
 	// Load configuration
 	cfg := config.LoadConfig()
-	
+
 	// Override for local testing
 	if cfg.ServerAddr == ":443" {
 		cfg.ServerAddr = ":8443"
@@ -164,7 +163,7 @@ func main() {
 
 	// Register custom server message handlers
 	startTime := time.Now()
-	
+
 	// Register custom handlers
 	if err := wsServer.RegisterServerHandler("system_status", &CustomStatusHandler{startTime: startTime}); err != nil {
 		log.Printf("Failed to register system_status handler: %v", err)
@@ -209,7 +208,7 @@ func main() {
 	// For development, use self-signed certificates
 	certFile := "server.crt"
 	keyFile := "server.key"
-	
+
 	// Check if certificates exist, if not, provide instructions
 	if _, err := os.Stat(certFile); os.IsNotExist(err) {
 		log.Println("Certificate files not found. Generating self-signed certificates...")
@@ -217,12 +216,12 @@ func main() {
 		// For this example, we'll use HTTP instead
 		cfg.ServerAddr = strings.Replace(cfg.ServerAddr, ":8443", ":8080", 1)
 		log.Printf("Falling back to HTTP on %s", cfg.ServerAddr)
-		
+
 		httpSrv := &http.Server{
 			Addr:    cfg.ServerAddr,
 			Handler: mux,
 		}
-		
+
 		go func() {
 			log.Printf("Starting HTTP server on %s", cfg.ServerAddr)
 			log.Println("\n=== Server Message Handlers Available ===")
@@ -242,7 +241,7 @@ func main() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		if err := httpSrv.Shutdown(ctx); err != nil {
 			log.Printf("Server forced to shutdown: %v", err)
 		}
@@ -289,7 +288,7 @@ func main() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		httpsSrv.Shutdown(ctx)
 		httpSrv.Shutdown(ctx)
 	}

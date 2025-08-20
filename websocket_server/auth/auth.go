@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -104,7 +104,7 @@ func (a *Service) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var payload RegistrationPayload
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -219,7 +219,7 @@ func (a *Service) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload LoginPayload
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
@@ -250,7 +250,7 @@ func (a *Service) handleChallengeResponse(w http.ResponseWriter, r *http.Request
 	clientIP := GetClientIP(r)
 
 	var payload ChallengeResponsePayload
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return

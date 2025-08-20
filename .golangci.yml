@@ -1,0 +1,119 @@
+run:
+  timeout: 10m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - .git
+    - .github
+    - scripts
+    - data
+    - certs
+    - bin
+    - dist
+    - releases
+
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - typecheck
+    - gocritic
+    - revive
+    - misspell
+    
+  disable:
+    - unused
+    - deadcode
+    - structcheck
+    - varcheck
+    - golint
+    - interfacer
+    - maligned
+    - ifshort
+    - exhaustivestruct
+    - scopelint
+
+linters-settings:
+  gofmt:
+    simplify: true
+  
+  goimports:
+    local-prefixes: github.com/genericwsserver,websocketserver
+  
+  govet:
+    enable-all: true
+    disable:
+      - shadow
+      - fieldalignment
+  
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+    
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+      - diagnostic
+    disabled-checks:
+      - hugeParam
+      - rangeValCopy
+      - appendAssign
+      - commentedOutCode
+      
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: dot-imports
+      - name: error-naming
+      - name: error-return
+      - name: exported
+      - name: indent-error-flow
+      - name: package-comments
+        disabled: true
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: var-declaration
+      - name: var-naming
+      
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  
+  exclude-rules:
+    # Exclude test files from some linters
+    - path: _test\.go
+      linters:
+        - gocritic
+        - errcheck
+        - dupl
+        
+    # Allow certain patterns in main packages
+    - path: main\.go
+      linters:
+        - gochecknoglobals
+        - gochecknoinits
+        
+    # Exclude generated files
+    - path: \.pb\.go
+      linters:
+        - gocritic
+        - golint
+        
+  exclude:
+    # Common false positives
+    - "Error return value of .* is not checked"
+    - "exported .* should have comment or be unexported"
+    - "ST1000: at least one file in a package should have a package comment"

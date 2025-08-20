@@ -32,7 +32,7 @@ func TestServerMessageHandler(t *testing.T) {
 	testHandler := &MockServerHandler{
 		response: map[string]string{"test": "response"},
 	}
-	
+
 	err = server.RegisterServerHandler("test_command", testHandler)
 	if err != nil {
 		t.Errorf("Failed to register handler: %v", err)
@@ -60,7 +60,7 @@ func TestServerMessageHandler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Handler execution failed: %v", err)
 	}
-	
+
 	respMap, ok := response.(map[string]string)
 	if !ok {
 		t.Error("Unexpected response type")
@@ -139,7 +139,7 @@ func TestServerMessageSignatureVerification(t *testing.T) {
 
 	// Test with invalid signature
 	msg.Header.Signature = base64.StdEncoding.EncodeToString([]byte("invalid_signature"))
-	
+
 	mock.ExpectQuery("SELECT public_key FROM users WHERE user_id = ?").
 		WithArgs("test_user").
 		WillReturnRows(sqlmock.NewRows([]string{"public_key"}).AddRow(publicKeyStr))
