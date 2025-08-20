@@ -1,0 +1,428 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
+
+env:
+  GO_VERSION: '1.22'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # =============================================================================
+  # Validation and Pre-checks
+  # =============================================================================
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.get-tag.outputs.tag }}
+      version: ${{ steps.get-tag.outputs.version }}
+      is-prerelease: ${{ steps.get-tag.outputs.is-prerelease }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Get release tag
+      id: get-tag
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          TAG="${{ github.event.inputs.tag }}"
+          IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+        else
+          TAG="${{ github.ref_name }}"
+          # Check if tag contains alpha, beta, rc for pre-release
+          if [[ "$TAG" =~ (alpha|beta|rc) ]]; then
+            IS_PRERELEASE="true"
+          else
+            IS_PRERELEASE="false"
+          fi
+        fi
+        
+        # Validate tag format
+        if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+          echo "::error::Invalid tag format: $TAG. Expected format: v1.2.3"
+          exit 1
+        fi
+        
+        VERSION=${TAG#v}  # Remove 'v' prefix
+        
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+        
+        echo "Release Tag: $TAG"
+        echo "Version: $VERSION"
+        echo "Pre-release: $IS_PRERELEASE"
+        
+    - name: Validate changelog
+      run: |
+        if [ -f "CHANGELOG.md" ]; then
+          if grep -q "${{ steps.get-tag.outputs.version }}" CHANGELOG.md; then
+            echo "✅ Changelog entry found for version ${{ steps.get-tag.outputs.version }}"
+          else
+            echo "::warning::No changelog entry found for version ${{ steps.get-tag.outputs.version }}"
+          fi
+        else
+          echo "::warning::No CHANGELOG.md file found"
+        fi
+
+  # =============================================================================
+  # Build Release Artifacts
+  # =============================================================================
+  build:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          # Windows ARM64 builds can be unreliable
+          - goos: windows
+            goarch: arm64
+            
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-build-${{ matrix.goos }}-${{ matrix.goarch }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-build-${{ matrix.goos }}-${{ matrix.goarch }}-
+          ${{ runner.os }}-go-build-
+          
+    - name: Install dependencies
+      run: |
+        # Install UPX for binary compression
+        sudo apt-get update
+        sudo apt-get install -y upx-ucl
+        
+    - name: Build WebSocket Server
+      working-directory: ./websocket_server
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 1
+      run: |
+        # Set binary name based on OS
+        BINARY_NAME="websocket_server"
+        if [ "$GOOS" = "windows" ]; then
+          BINARY_NAME="websocket_server.exe"
+        fi
+        
+        # Build with optimizations
+        go build -ldflags="-s -w -X main.version=${{ needs.validate.outputs.version }} -X main.buildTime=$(date -u +%Y%m%d-%H%M%S)" \
+                 -o "../dist/websocket_server_${GOOS}_${GOARCH}/$BINARY_NAME" .
+        
+        # Compress binary (skip for macOS due to code signing issues)
+        if [ "$GOOS" != "darwin" ]; then
+          upx --best "../dist/websocket_server_${GOOS}_${GOARCH}/$BINARY_NAME" || true
+        fi
+        
+    - name: Build Client SDK Examples
+      working-directory: ./client-sdk
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        # Set binary extension based on OS
+        EXT=""
+        if [ "$GOOS" = "windows" ]; then
+          EXT=".exe"
+        fi
+        
+        # Build examples
+        mkdir -p "../dist/client_sdk_${GOOS}_${GOARCH}/examples"
+        
+        cd examples/simple
+        go build -ldflags="-s -w" -o "../../dist/client_sdk_${GOOS}_${GOARCH}/examples/simple${EXT}" .
+        
+        cd ../advanced
+        go build -ldflags="-s -w" -o "../../dist/client_sdk_${GOOS}_${GOARCH}/examples/advanced${EXT}" .
+        
+        cd ../server-messages/client
+        go build -ldflags="-s -w" -o "../../../dist/client_sdk_${GOOS}_${GOARCH}/examples/client${EXT}" .
+        
+        cd ../server
+        go build -ldflags="-s -w" -o "../../../dist/client_sdk_${GOOS}_${GOARCH}/examples/server${EXT}" .
+        
+    - name: Create distribution packages
+      run: |
+        cd dist
+        
+        # Create WebSocket Server package
+        WS_DIR="websocket_server_${{ matrix.goos }}_${{ matrix.goarch }}"
+        tar -czf "${WS_DIR}.tar.gz" "$WS_DIR"
+        
+        # Create Client SDK package
+        CLIENT_DIR="client_sdk_${{ matrix.goos }}_${{ matrix.goarch }}"
+        tar -czf "${CLIENT_DIR}.tar.gz" "$CLIENT_DIR"
+        
+        # Generate checksums
+        sha256sum *.tar.gz > checksums.txt
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: |
+          dist/*.tar.gz
+          dist/checksums.txt
+        retention-days: 7
+
+  # =============================================================================
+  # Create GitHub Release
+  # =============================================================================
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, build]
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts/
+        
+    - name: Prepare release assets
+      run: |
+        mkdir -p release-assets
+        
+        # Collect all build artifacts
+        find artifacts/ -name "*.tar.gz" -exec cp {} release-assets/ \;
+        
+        # Combine checksums from all builds
+        find artifacts/ -name "checksums.txt" -exec cat {} \; | sort -u > release-assets/checksums.txt
+        
+        # List all assets
+        echo "Release assets:"
+        ls -la release-assets/
+        
+    - name: Generate release notes
+      id: release-notes
+      run: |
+        # Generate release notes from git log
+        TAG="${{ needs.validate.outputs.tag }}"
+        PREV_TAG=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "")
+        
+        echo "# Release $TAG" > release-notes.md
+        echo "" >> release-notes.md
+        
+        if [ -n "$PREV_TAG" ]; then
+          echo "## Changes since $PREV_TAG" >> release-notes.md
+          echo "" >> release-notes.md
+          git log --pretty=format:"- %s (%h)" "$PREV_TAG..$TAG" >> release-notes.md
+        else
+          echo "## Initial Release" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "This is the first release of GenericWSServer." >> release-notes.md
+        fi
+        
+        echo "" >> release-notes.md
+        echo "## Downloads" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "### WebSocket Server Binaries" >> release-notes.md
+        echo "- Linux (x64): \`websocket_server_linux_amd64.tar.gz\`" >> release-notes.md
+        echo "- Linux (ARM64): \`websocket_server_linux_arm64.tar.gz\`" >> release-notes.md
+        echo "- macOS (x64): \`websocket_server_darwin_amd64.tar.gz\`" >> release-notes.md
+        echo "- macOS (ARM64): \`websocket_server_darwin_arm64.tar.gz\`" >> release-notes.md
+        echo "- Windows (x64): \`websocket_server_windows_amd64.tar.gz\`" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "### Client SDK Examples" >> release-notes.md
+        echo "- Linux (x64): \`client_sdk_linux_amd64.tar.gz\`" >> release-notes.md
+        echo "- Linux (ARM64): \`client_sdk_linux_arm64.tar.gz\`" >> release-notes.md
+        echo "- macOS (x64): \`client_sdk_darwin_amd64.tar.gz\`" >> release-notes.md
+        echo "- macOS (ARM64): \`client_sdk_darwin_arm64.tar.gz\`" >> release-notes.md
+        echo "- Windows (x64): \`client_sdk_windows_amd64.tar.gz\`" >> release-notes.md
+        echo "" >> release-notes.md
+        echo "## Verification" >> release-notes.md
+        echo "Verify downloads using the provided \`checksums.txt\` file:" >> release-notes.md
+        echo "\`\`\`bash" >> release-notes.md
+        echo "sha256sum -c checksums.txt" >> release-notes.md
+        echo "\`\`\`" >> release-notes.md
+        
+        # Read release notes for output
+        RELEASE_NOTES=$(cat release-notes.md)
+        echo "release-notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.validate.outputs.tag }}
+        name: Release ${{ needs.validate.outputs.tag }}
+        body: ${{ steps.release-notes.outputs.release-notes }}
+        draft: false
+        prerelease: ${{ needs.validate.outputs.is-prerelease }}
+        files: |
+          release-assets/*
+        generate_release_notes: false
+        make_latest: ${{ needs.validate.outputs.is-prerelease == 'false' }}
+
+  # =============================================================================
+  # Build and Push Docker Images (Optional)
+  # =============================================================================
+  docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [validate, build]
+    timeout-minutes: 20
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease == 'false')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=tag
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./websocket_server
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ needs.validate.outputs.version }}
+          BUILD_TIME=${{ github.run_number }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # =============================================================================
+  # Update Documentation and Distribution
+  # =============================================================================
+  update-docs:
+    name: Update Documentation
+    runs-on: ubuntu-latest
+    needs: [validate, release]
+    timeout-minutes: 10
+    if: needs.validate.outputs.is-prerelease == 'false'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Update version in documentation
+      run: |
+        VERSION="${{ needs.validate.outputs.version }}"
+        
+        # Update README.md with new version
+        if [ -f "README.md" ]; then
+          sed -i "s/Version: [0-9]\+\.[0-9]\+\.[0-9]\+/Version: $VERSION/g" README.md || true
+          sed -i "s/v[0-9]\+\.[0-9]\+\.[0-9]\+/v$VERSION/g" README.md || true
+        fi
+        
+        # Update installation scripts
+        if [ -f "install.sh" ]; then
+          sed -i "s/VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/g" install.sh || true
+        fi
+        
+        # Check if there are changes to commit
+        if git diff --quiet; then
+          echo "No documentation updates needed"
+        else
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "docs: update version to $VERSION [skip ci]" || true
+          git push || true
+        fi
+
+  # =============================================================================
+  # Release Summary
+  # =============================================================================
+  release-summary:
+    name: Release Summary
+    runs-on: ubuntu-latest
+    needs: [validate, build, release, docker, update-docs]
+    if: always()
+    
+    steps:
+    - name: Release Summary
+      run: |
+        echo "🚀 Release Summary for ${{ needs.validate.outputs.tag }}"
+        echo "=============================================="
+        echo "Version: ${{ needs.validate.outputs.version }}"
+        echo "Pre-release: ${{ needs.validate.outputs.is-prerelease }}"
+        echo ""
+        echo "Job Results:"
+        echo "- Validation: ${{ needs.validate.result }}"
+        echo "- Build: ${{ needs.build.result }}"
+        echo "- Release: ${{ needs.release.result }}"
+        echo "- Docker: ${{ needs.docker.result }}"
+        echo "- Update Docs: ${{ needs.update-docs.result }}"
+        echo ""
+        
+        if [[ "${{ needs.release.result }}" == "success" ]]; then
+          echo "✅ Release ${{ needs.validate.outputs.tag }} created successfully!"
+          echo "📦 Artifacts available at: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.tag }}"
+        else
+          echo "❌ Release creation failed"
+          exit 1
+        fi

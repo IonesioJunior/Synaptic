@@ -1,0 +1,395 @@
+name: Coverage
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+env:
+  GO_VERSION: '1.22'
+  COVERAGE_THRESHOLD: 70
+
+jobs:
+  # =============================================================================
+  # Test Coverage Collection
+  # =============================================================================
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-coverage-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-coverage-
+          ${{ runner.os }}-go-
+          
+    - name: Install coverage tools
+      run: |
+        go install github.com/jandelgado/gcov2lcov@latest
+        go install github.com/axw/gocov/gocov@latest
+        go install github.com/AlekSi/gocov-xml@latest
+        
+    - name: Download dependencies (websocket_server)
+      working-directory: ./websocket_server
+      run: go mod download
+      
+    - name: Download dependencies (client-sdk)
+      working-directory: ./client-sdk
+      run: go mod download
+      
+    - name: Run tests with coverage (websocket_server)
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::WebSocket Server Coverage"
+        go test -v -race -coverprofile=coverage.out -covermode=atomic \
+                 -timeout=10m ./config ./db ./auth ./metrics ./handlers ./models ./ws
+        
+        # Generate coverage statistics
+        go tool cover -func=coverage.out > coverage-func.txt
+        go tool cover -html=coverage.out -o coverage.html
+        
+        # Calculate coverage percentage
+        COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+        echo "WEBSOCKET_COVERAGE=$COVERAGE" >> $GITHUB_ENV
+        echo "WebSocket Server Coverage: $COVERAGE%"
+        echo "::endgroup::"
+        
+    - name: Run tests with coverage (client-sdk)
+      working-directory: ./client-sdk
+      run: |
+        echo "::group::Client SDK Coverage"
+        go test -v -race -coverprofile=coverage.out -covermode=atomic -timeout=10m ./...
+        
+        # Generate coverage statistics
+        go tool cover -func=coverage.out > coverage-func.txt
+        go tool cover -html=coverage.out -o coverage.html
+        
+        # Calculate coverage percentage
+        COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+        echo "CLIENT_COVERAGE=$COVERAGE" >> $GITHUB_ENV
+        echo "Client SDK Coverage: $COVERAGE%"
+        echo "::endgroup::"
+        
+    - name: Combine coverage reports
+      run: |
+        echo "::group::Combined Coverage Analysis"
+        
+        # Create combined coverage directory
+        mkdir -p coverage-reports
+        
+        # Copy individual reports
+        cp websocket_server/coverage.out coverage-reports/websocket-coverage.out
+        cp websocket_server/coverage.html coverage-reports/websocket-coverage.html
+        cp websocket_server/coverage-func.txt coverage-reports/websocket-coverage-func.txt
+        
+        cp client-sdk/coverage.out coverage-reports/client-coverage.out
+        cp client-sdk/coverage.html coverage-reports/client-coverage.html
+        cp client-sdk/coverage-func.txt coverage-reports/client-coverage-func.txt
+        
+        # Generate LCOV format for external tools
+        cd websocket_server && gcov2lcov -infile=coverage.out -outfile=../coverage-reports/websocket-lcov.info
+        cd ../client-sdk && gcov2lcov -infile=coverage.out -outfile=../coverage-reports/client-lcov.info
+        cd ..
+        
+        # Calculate overall project coverage
+        WS_COV=${WEBSOCKET_COVERAGE:-0}
+        CLIENT_COV=${CLIENT_COVERAGE:-0}
+        
+        # Weighted average (websocket_server is larger, so weight it more)
+        OVERALL_COVERAGE=$(echo "scale=2; ($WS_COV * 0.7) + ($CLIENT_COV * 0.3)" | bc -l)
+        echo "OVERALL_COVERAGE=$OVERALL_COVERAGE" >> $GITHUB_ENV
+        
+        echo "Overall Project Coverage: $OVERALL_COVERAGE%"
+        echo "::endgroup::"
+        
+    - name: Generate coverage summary
+      run: |
+        cat > coverage-reports/coverage-summary.md << EOF
+        # Test Coverage Report
+        
+        ## Overall Coverage: $OVERALL_COVERAGE%
+        
+        ### Module Breakdown:
+        - **WebSocket Server**: $WEBSOCKET_COVERAGE%
+        - **Client SDK**: $CLIENT_COVERAGE%
+        
+        ### Coverage Threshold: $COVERAGE_THRESHOLD%
+        
+        ### Status:
+        EOF
+        
+        if (( $(echo "$OVERALL_COVERAGE >= $COVERAGE_THRESHOLD" | bc -l) )); then
+          echo "✅ **PASSED** - Coverage meets minimum threshold" >> coverage-reports/coverage-summary.md
+        else
+          echo "❌ **FAILED** - Coverage below minimum threshold" >> coverage-reports/coverage-summary.md
+        fi
+        
+        cat >> coverage-reports/coverage-summary.md << EOF
+        
+        ### Detailed Reports:
+        - [WebSocket Server HTML Report](./websocket-coverage.html)
+        - [Client SDK HTML Report](./client-coverage.html)
+        
+        Generated on: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        EOF
+        
+    - name: Check coverage threshold
+      run: |
+        echo "Checking coverage threshold: $OVERALL_COVERAGE% >= $COVERAGE_THRESHOLD%"
+        if (( $(echo "$OVERALL_COVERAGE < $COVERAGE_THRESHOLD" | bc -l) )); then
+          echo "::error::Coverage $OVERALL_COVERAGE% is below threshold $COVERAGE_THRESHOLD%"
+          exit 1
+        else
+          echo "::notice::Coverage $OVERALL_COVERAGE% meets threshold $COVERAGE_THRESHOLD%"
+        fi
+        
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-reports-${{ github.sha }}
+        path: coverage-reports/
+        retention-days: 30
+        
+    - name: Upload to Codecov (websocket_server)
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./websocket_server/coverage.out
+        flags: websocket-server
+        name: websocket-server-coverage
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+        
+    - name: Upload to Codecov (client-sdk)
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./client-sdk/coverage.out
+        flags: client-sdk
+        name: client-sdk-coverage
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  # =============================================================================
+  # Coverage Analysis and Reporting
+  # =============================================================================
+  coverage-analysis:
+    name: Coverage Analysis
+    runs-on: ubuntu-latest
+    needs: coverage
+    timeout-minutes: 10
+    if: always() && needs.coverage.result != 'cancelled'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download coverage reports
+      uses: actions/download-artifact@v4
+      with:
+        name: coverage-reports-${{ github.sha }}
+        path: coverage-reports/
+        
+    - name: Analyze coverage gaps
+      run: |
+        echo "::group::Coverage Gap Analysis"
+        
+        # Analyze uncovered code in critical files
+        echo "## Critical Files Coverage Analysis" > coverage-analysis.md
+        echo "" >> coverage-analysis.md
+        
+        for module in websocket client; do
+          if [ -f "coverage-reports/${module}-coverage-func.txt" ]; then
+            echo "### ${module^} Module:" >> coverage-analysis.md
+            echo "\`\`\`" >> coverage-analysis.md
+            
+            # Show files with coverage below 80%
+            awk '$3 < 80.0 && $1 != "total:" {print $1 ": " $3}' "coverage-reports/${module}-coverage-func.txt" | \
+            head -10 >> coverage-analysis.md
+            
+            echo "\`\`\`" >> coverage-analysis.md
+            echo "" >> coverage-analysis.md
+          fi
+        done
+        
+        echo "::endgroup::"
+        
+    - name: Generate coverage badge data
+      run: |
+        # Extract overall coverage for badge generation
+        COVERAGE=$(echo ${{ needs.coverage.outputs.OVERALL_COVERAGE }} | cut -d'.' -f1)
+        
+        if [ "$COVERAGE" -ge 90 ]; then
+          COLOR="brightgreen"
+        elif [ "$COVERAGE" -ge 80 ]; then
+          COLOR="green"
+        elif [ "$COVERAGE" -ge 70 ]; then
+          COLOR="yellow"
+        elif [ "$COVERAGE" -ge 60 ]; then
+          COLOR="orange"
+        else
+          COLOR="red"
+        fi
+        
+        echo "COVERAGE_BADGE_COLOR=$COLOR" >> $GITHUB_ENV
+        echo "COVERAGE_PERCENTAGE=$COVERAGE" >> $GITHUB_ENV
+        
+    - name: Comment on PR (if applicable)
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const fs = require('fs');
+          
+          try {
+            const coverageSummary = fs.readFileSync('coverage-reports/coverage-summary.md', 'utf8');
+            const coverageAnalysis = fs.readFileSync('coverage-analysis.md', 'utf8');
+            
+            const comment = `${coverageSummary}
+            
+            <details>
+            <summary>📊 Coverage Gap Analysis</summary>
+            
+            ${coverageAnalysis}
+            </details>
+            
+            ---
+            *Coverage report generated by GitHub Actions*`;
+            
+            // Find existing coverage comment
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existingComment = comments.data.find(comment => 
+              comment.body.includes('# Test Coverage Report')
+            );
+            
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: comment
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+          } catch (error) {
+            console.log('Could not post coverage comment:', error.message);
+          }
+
+  # =============================================================================
+  # Benchmark Coverage Tests
+  # =============================================================================
+  benchmark-coverage:
+    name: Benchmark Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-bench-coverage-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-bench-coverage-
+          ${{ runner.os }}-go-
+          
+    - name: Run benchmarks with coverage (websocket_server)
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::WebSocket Server Benchmark Coverage"
+        go test -bench=. -benchmem -coverprofile=bench-coverage.out \
+                 -covermode=atomic -timeout=10m ./config ./db ./auth ./metrics ./handlers ./models
+        
+        # Generate benchmark coverage report
+        go tool cover -func=bench-coverage.out > bench-coverage-func.txt
+        echo "::endgroup::"
+        
+    - name: Run benchmarks with coverage (client-sdk)
+      working-directory: ./client-sdk
+      run: |
+        echo "::group::Client SDK Benchmark Coverage"
+        go test -bench=. -benchmem -coverprofile=bench-coverage.out \
+                 -covermode=atomic -timeout=10m ./...
+        
+        # Generate benchmark coverage report
+        go tool cover -func=bench-coverage.out > bench-coverage-func.txt
+        echo "::endgroup::"
+        
+    - name: Upload benchmark coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-coverage-${{ github.sha }}
+        path: |
+          websocket_server/bench-coverage*
+          client-sdk/bench-coverage*
+        retention-days: 7
+
+  # =============================================================================
+  # Coverage Summary Job
+  # =============================================================================
+  coverage-summary:
+    name: Coverage Summary
+    runs-on: ubuntu-latest
+    needs: [coverage, coverage-analysis]
+    if: always()
+    
+    steps:
+    - name: Check Coverage Results
+      run: |
+        echo "Coverage Results Summary:"
+        echo "Test Coverage: ${{ needs.coverage.result }}"
+        echo "Coverage Analysis: ${{ needs.coverage-analysis.result }}"
+        
+        if [[ "${{ needs.coverage.result }}" == "failure" ]]; then
+          echo "::error::Coverage check failed - below minimum threshold"
+          exit 1
+        elif [[ "${{ needs.coverage.result }}" == "success" ]]; then
+          echo "::notice::Coverage check passed ✅"
+        else
+          echo "::warning::Coverage check completed with warnings"
+        fi

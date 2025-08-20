@@ -1,0 +1,368 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION_MATRIX: '["1.20", "1.21", "1.22"]'
+
+jobs:
+  # =============================================================================
+  # Code Quality and Formatting
+  # =============================================================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-quality-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-quality-
+          ${{ runner.os }}-go-
+
+    - name: Install tools
+      run: |
+        go install golang.org/x/tools/cmd/goimports@latest
+        go install honnef.co/go/tools/cmd/staticcheck@latest
+
+    - name: Check formatting (websocket_server)
+      working-directory: ./websocket_server
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "::error::Code is not formatted. Run 'gofmt -s -w .'"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Check formatting (client-sdk)
+      working-directory: ./client-sdk
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "::error::Code is not formatted. Run 'gofmt -s -w .'"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Check imports (websocket_server)
+      working-directory: ./websocket_server
+      run: |
+        if [ "$(goimports -l . | wc -l)" -gt 0 ]; then
+          echo "::error::Imports are not formatted. Run 'goimports -w .'"
+          goimports -l .
+          exit 1
+        fi
+
+    - name: Check imports (client-sdk)
+      working-directory: ./client-sdk
+      run: |
+        if [ "$(goimports -l . | wc -l)" -gt 0 ]; then
+          echo "::error::Imports are not formatted. Run 'goimports -w .'"
+          goimports -l .
+          exit 1
+        fi
+
+    - name: Static analysis (websocket_server)
+      working-directory: ./websocket_server
+      run: staticcheck ./...
+
+    - name: Static analysis (client-sdk)
+      working-directory: ./client-sdk
+      run: staticcheck ./...
+
+  # =============================================================================
+  # Linting
+  # =============================================================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-lint-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-lint-
+          ${{ runner.os }}-go-
+
+    - name: golangci-lint (websocket_server)
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+        working-directory: ./websocket_server
+        args: --timeout=10m --config=../.golangci.yml
+
+    - name: golangci-lint (client-sdk)
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+        working-directory: ./client-sdk
+        args: --timeout=10m --config=../.golangci.yml
+
+  # =============================================================================
+  # Testing Matrix
+  # =============================================================================
+  test:
+    name: Test (Go ${{ matrix.go-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ["1.20", "1.21", "1.22"]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies (websocket_server)
+      working-directory: ./websocket_server
+      run: go mod download
+
+    - name: Download dependencies (client-sdk)
+      working-directory: ./client-sdk
+      run: go mod download
+
+    - name: Run tests (websocket_server)
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::WebSocket Server Tests"
+        go test -v -race -timeout=10m ./config ./db ./auth ./metrics ./handlers ./models ./ws
+        echo "::endgroup::"
+
+    - name: Run tests (client-sdk)
+      working-directory: ./client-sdk
+      run: |
+        echo "::group::Client SDK Tests"
+        go test -v -race -timeout=10m ./...
+        echo "::endgroup::"
+
+    - name: Run integration tests
+      working-directory: ./client-sdk
+      run: |
+        echo "::group::Integration Tests"
+        go test -v -race -timeout=15m -tags=integration ./...
+        echo "::endgroup::"
+
+  # =============================================================================
+  # Performance Benchmarks
+  # =============================================================================
+  benchmarks:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-bench-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-bench-
+          ${{ runner.os }}-go-
+
+    - name: Run benchmarks (websocket_server)
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::WebSocket Server Benchmarks"
+        go test -bench=. -benchmem -timeout=10m ./config ./db ./auth ./metrics ./handlers ./models
+        echo "::endgroup::"
+
+    - name: Run benchmarks (client-sdk)
+      working-directory: ./client-sdk
+      run: |
+        echo "::group::Client SDK Benchmarks"
+        go test -bench=. -benchmem -timeout=10m ./...
+        echo "::endgroup::"
+
+  # =============================================================================
+  # Build Verification
+  # =============================================================================
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-build-
+          ${{ runner.os }}-go-
+
+    - name: Build websocket_server
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::Building WebSocket Server"
+        go build -v -ldflags="-s -w" -o ../bin/websocket_server .
+        echo "::endgroup::"
+
+    - name: Build client-sdk examples
+      working-directory: ./client-sdk
+      run: |
+        echo "::group::Building Client SDK Examples"
+        cd examples/simple && go build -v -o ../../bin/simple .
+        cd ../advanced && go build -v -o ../../bin/advanced .
+        cd ../server-messages/client && go build -v -o ../../../bin/client .
+        cd ../server && go build -v -o ../../../bin/server .
+        echo "::endgroup::"
+
+    - name: Verify builds
+      run: |
+        echo "::group::Build Verification"
+        ls -la bin/
+        file bin/*
+        echo "::endgroup::"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries-${{ github.sha }}
+        path: bin/
+        retention-days: 7
+
+  # =============================================================================
+  # Cross-Platform Build Test
+  # =============================================================================
+  cross-compile:
+    name: Cross Compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+        
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-cross-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-cross-
+          ${{ runner.os }}-go-
+
+    - name: Test cross-compilation
+      working-directory: ./websocket_server
+      run: |
+        echo "::group::Cross-Compilation Test"
+        
+        # Test major platforms
+        GOOS=linux GOARCH=amd64 go build -o /tmp/websocket_server_linux_amd64 .
+        GOOS=linux GOARCH=arm64 go build -o /tmp/websocket_server_linux_arm64 .
+        GOOS=darwin GOARCH=amd64 go build -o /tmp/websocket_server_darwin_amd64 .
+        GOOS=darwin GOARCH=arm64 go build -o /tmp/websocket_server_darwin_arm64 .
+        GOOS=windows GOARCH=amd64 go build -o /tmp/websocket_server_windows_amd64.exe .
+        
+        echo "Cross-compilation successful for all target platforms"
+        echo "::endgroup::"
+
+  # =============================================================================
+  # Summary Job
+  # =============================================================================
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [code-quality, lint, test, benchmarks, build, cross-compile]
+    if: always()
+    
+    steps:
+    - name: Check CI Results
+      run: |
+        echo "CI Results Summary:"
+        echo "Code Quality: ${{ needs.code-quality.result }}"
+        echo "Lint: ${{ needs.lint.result }}"
+        echo "Test: ${{ needs.test.result }}"
+        echo "Benchmarks: ${{ needs.benchmarks.result }}"
+        echo "Build: ${{ needs.build.result }}"
+        echo "Cross Compile: ${{ needs.cross-compile.result }}"
+        
+        if [[ "${{ needs.code-quality.result }}" != "success" || \
+              "${{ needs.lint.result }}" != "success" || \
+              "${{ needs.test.result }}" != "success" || \
+              "${{ needs.benchmarks.result }}" != "success" || \
+              "${{ needs.build.result }}" != "success" || \
+              "${{ needs.cross-compile.result }}" != "success" ]]; then
+          echo "::error::One or more CI jobs failed"
+          exit 1
+        fi
+        
+        echo "::notice::All CI jobs completed successfully! ✅"
