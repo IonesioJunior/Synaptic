@@ -98,7 +98,7 @@ func (s *Service) HandleCheckUserID(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleRegistration registers a new user.
-func (a *Service) HandleRegistration(w http.ResponseWriter, r *http.Request) {
+func (s *Service) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -119,10 +119,10 @@ func (a *Service) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 
 	// Insert the new user into the database.
 	query := `INSERT INTO users (user_id, username, public_key, x25519_public_key) VALUES (?, ?, ?, ?)`
-	_, err = a.db.Exec(query, payload.UserID, payload.Username, payload.PublicKey, payload.X25519PublicKey)
+	_, err = s.db.Exec(query, payload.UserID, payload.Username, payload.PublicKey, payload.X25519PublicKey)
 	if err != nil {
 		// Log failed registration
-		a.logger.LogAuthEvent(SecurityEvent{
+		s.logger.LogAuthEvent(SecurityEvent{
 			Timestamp: time.Now(),
 			Event:     "REGISTRATION_FAILED",
 			UserID:    payload.UserID,
@@ -135,7 +135,7 @@ func (a *Service) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log successful registration
-	a.logger.LogAuthEvent(SecurityEvent{
+	s.logger.LogAuthEvent(SecurityEvent{
 		Timestamp: time.Now(),
 		Event:     "REGISTRATION_SUCCESS",
 		UserID:    payload.UserID,
@@ -149,7 +149,7 @@ func (a *Service) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleGetUserInfo retrieves a user's public key and other information
-func (a *Service) HandleGetUserInfo(w http.ResponseWriter, r *http.Request) {
+func (s *Service) HandleGetUserInfo(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -178,7 +178,7 @@ func (a *Service) HandleGetUserInfo(w http.ResponseWriter, r *http.Request) {
 		X25519PublicKey string `json:"x25519_public_key,omitempty"`
 	}
 
-	err := a.db.QueryRow(query, userID).Scan(&user.UserID, &user.Username, &user.PublicKey, &user.X25519PublicKey)
+	err := s.db.QueryRow(query, userID).Scan(&user.UserID, &user.Username, &user.PublicKey, &user.X25519PublicKey)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "User not found", http.StatusNotFound)
@@ -206,7 +206,7 @@ type ChallengeResponsePayload struct {
 
 // HandleLogin handles both the challenge issuance and the verification phases.
 // When the "verify" query parameter is set to "true", the server will verify the challenge response.
-func (a *Service) HandleLogin(w http.ResponseWriter, r *http.Request) {
+func (s *Service) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -214,7 +214,7 @@ func (a *Service) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Check if this request is to verify the challenge response.
 	if r.URL.Query().Get("verify") == "true" {
-		a.handleChallengeResponse(w, r)
+		s.handleChallengeResponse(w, r)
 		return
 	}
 
@@ -236,7 +236,7 @@ func (a *Service) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	challenge := base64.StdEncoding.EncodeToString(challengeBytes)
-	a.challenges.Store(payload.UserID, challenge)
+	s.challenges.Store(payload.UserID, challenge)
 
 	// Return the challenge to the client.
 	resp := map[string]string{"challenge": challenge}
@@ -246,7 +246,7 @@ func (a *Service) HandleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleChallengeResponse verifies the client's signature of the challenge.
-func (a *Service) handleChallengeResponse(w http.ResponseWriter, r *http.Request) {
+func (s *Service) handleChallengeResponse(w http.ResponseWriter, r *http.Request) {
 	clientIP := GetClientIP(r)
 
 	var payload ChallengeResponsePayload
@@ -261,9 +261,9 @@ func (a *Service) handleChallengeResponse(w http.ResponseWriter, r *http.Request
 	}
 
 	// Retrieve the challenge that was issued to this user.
-	challengeVal, ok := a.challenges.Load(payload.UserID)
+	challengeVal, ok := s.challenges.Load(payload.UserID)
 	if !ok {
-		a.logger.LogAuthEvent(SecurityEvent{
+		s.logger.LogAuthEvent(SecurityEvent{
 			Timestamp: time.Now(),
 			Event:     EventLogin,
 			UserID:    payload.UserID,
@@ -283,9 +283,9 @@ func (a *Service) handleChallengeResponse(w http.ResponseWriter, r *http.Request
 	// Fetch the user's public key from the database.
 	var publicKeyStr string
 	query := "SELECT public_key FROM users WHERE user_id = ?"
-	err = a.db.QueryRow(query, payload.UserID).Scan(&publicKeyStr)
+	err = s.db.QueryRow(query, payload.UserID).Scan(&publicKeyStr)
 	if err != nil {
-		a.logger.LogAuthEvent(SecurityEvent{
+		s.logger.LogAuthEvent(SecurityEvent{
 			Timestamp: time.Now(),
 			Event:     EventLogin,
 			UserID:    payload.UserID,
@@ -318,7 +318,7 @@ func (a *Service) handleChallengeResponse(w http.ResponseWriter, r *http.Request
 
 	// Verify the signature using ed25519.
 	if !ed25519.Verify(pubKeyBytes, challengeBytes, signatureBytes) {
-		a.logger.LogAuthEvent(SecurityEvent{
+		s.logger.LogAuthEvent(SecurityEvent{
 			Timestamp: time.Now(),
 			Event:     EventLogin,
 			UserID:    payload.UserID,
@@ -335,14 +335,14 @@ func (a *Service) handleChallengeResponse(w http.ResponseWriter, r *http.Request
 		"user_id": payload.UserID,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
 	})
-	tokenString, err := token.SignedString(a.jwtSecret)
+	tokenString, err := token.SignedString(s.jwtSecret)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
 	// Log successful login
-	a.logger.LogAuthEvent(SecurityEvent{
+	s.logger.LogAuthEvent(SecurityEvent{
 		Timestamp: time.Now(),
 		Event:     EventLogin,
 		UserID:    payload.UserID,

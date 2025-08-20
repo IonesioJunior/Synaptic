@@ -31,7 +31,7 @@ func NewLogger(logFilePath string) *Logger {
 
 	// If a log file path is provided, open it for appending
 	if logFilePath != "" {
-		file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		file, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
 			log.Printf("Failed to open security log file %s: %v (will use stdout only)", logFilePath, err)
 		} else {
@@ -113,5 +113,5 @@ const (
 func SendAuthErrorResponse(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	w.Write([]byte(fmt.Sprintf(`{"error":true,"message":"%s"}`, message)))
+	fmt.Fprintf(w, `{"error":true,"message":"%s"}`, message)
 }

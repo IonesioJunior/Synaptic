@@ -26,12 +26,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer database.Close()
 
 	// Run migrations to create required tables.
 	if err := db.RunMigrations(database); err != nil {
+		database.Close()
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
+
+	defer database.Close()
 
 	metrics.InitPersistence(database)
 

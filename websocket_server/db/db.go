@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
 // Initialize opens a SQLite database connection and enables WAL mode.

@@ -150,7 +150,7 @@ func (s *Server) sendServerResponse(client *Client, originalMsg models.Message, 
 }
 
 // sendServerError sends an error response to a server message
-func (s *Server) sendServerError(client *Client, originalMsg models.Message, errorMsg string, requestID string) {
+func (s *Server) sendServerError(client *Client, originalMsg models.Message, errorMsg, requestID string) {
 	response := models.ServerResponse{
 		Success:   false,
 		RequestID: requestID,
