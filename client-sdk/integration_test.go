@@ -236,7 +236,7 @@ func TestIntegrationReconnection(t *testing.T) {
 	// Track connection events
 	connectCount := 0
 	reconnected := make(chan bool, 1)
-	
+
 	client.OnConnect(func() {
 		connectCount++
 		t.Logf("Connection established (count: %d)", connectCount)
@@ -245,7 +245,7 @@ func TestIntegrationReconnection(t *testing.T) {
 			reconnected <- true
 		}
 	})
-	
+
 	client.OnReconnect(func(attempt int) {
 		t.Logf("Reconnection attempt %d scheduled", attempt)
 	})
@@ -257,7 +257,7 @@ func TestIntegrationReconnection(t *testing.T) {
 
 	// Wait for initial connection to establish
 	time.Sleep(100 * time.Millisecond)
-	
+
 	if !client.IsConnected() {
 		t.Fatal("Client should be connected")
 	}
@@ -272,7 +272,7 @@ func TestIntegrationReconnection(t *testing.T) {
 		client.conn.Close()
 	}
 	client.connLock.Unlock()
-	
+
 	// Give the client time to detect disconnection and trigger reconnection
 	time.Sleep(200 * time.Millisecond)
 

@@ -275,21 +275,26 @@ jobs:
           ${{ runner.os }}-go-audit-
           ${{ runner.os }}-go-
           
-    - name: Install Nancy
-      run: go install github.com/sonatypecommunity/nancy@latest
+    - name: Install OSV-Scanner
+      run: |
+        curl -L https://github.com/google/osv-scanner/releases/download/v1.4.3/osv-scanner_1.4.3_linux_amd64 -o osv-scanner
+        chmod +x osv-scanner
+        sudo mv osv-scanner /usr/local/bin/
       
     - name: Audit dependencies (websocket_server)
       working-directory: ./websocket_server
       run: |
         echo "::group::WebSocket Server Dependency Audit"
-        go list -json -deps ./... | nancy sleuth --loud || true
+        osv-scanner --json . > ../osv-websocket.json 2>&1 || true
+        osv-scanner . || true
         echo "::endgroup::"
         
     - name: Audit dependencies (client-sdk)
       working-directory: ./client-sdk
       run: |
         echo "::group::Client SDK Dependency Audit"
-        go list -json -deps ./... | nancy sleuth --loud || true
+        osv-scanner --json . > ../osv-client.json 2>&1 || true
+        osv-scanner . || true
         echo "::endgroup::"
         
     - name: Check for known vulnerabilities in go.mod
@@ -303,6 +308,15 @@ jobs:
           cd ..
         done
         echo "::endgroup::"
+        
+    - name: Upload OSV scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: osv-scan-results
+        path: |
+          osv-*.json
+        retention-days: 30
 
   # =============================================================================
   # OWASP ZAP Security Testing (API endpoints)
