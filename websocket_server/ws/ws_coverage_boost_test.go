@@ -10,11 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"websocketserver/auth"
+	"websocketserver/db"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 	_ "github.com/mattn/go-sqlite3"
-	"websocketserver/auth"
-	"websocketserver/db"
 )
 
 // setupTestDB creates an in-memory SQLite database for testing
@@ -117,7 +118,7 @@ func TestHandleWebSocketCoverage(t *testing.T) {
 	// Test case 4: Valid connection with WebSocket upgrade
 	t.Run("ValidConnection", func(t *testing.T) {
 		token, _ := generateJWT("test-user-1", jwtSecret)
-		
+
 		// Create test server
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			server.HandleWebSocket(w, r)
@@ -409,11 +410,11 @@ func TestRetrieveUndeliveredMessagesCoverage(t *testing.T) {
 			SELECT COUNT(*) FROM messages 
 			WHERE to_user = 'test-user-1' AND status = 'pending'
 		`).Scan(&pendingCount)
-		
+
 		if err != nil {
 			t.Errorf("Failed to query pending messages: %v", err)
 		}
-		
+
 		// Messages should still be pending since we don't have a client to send to
 		if pendingCount != 2 {
 			t.Errorf("Expected 2 pending messages, got %d", pendingCount)
@@ -454,7 +455,7 @@ func TestRateLimiterIntegration(t *testing.T) {
 	server := NewServer(testDB, authService, 1.0, 2, []string{})
 
 	token, _ := generateJWT("test-user-1", jwtSecret)
-	
+
 	// Create test server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		server.HandleWebSocket(w, r)
@@ -498,7 +499,7 @@ func TestRateLimiterIntegration(t *testing.T) {
 func TestWebSocketWithDatabase(t *testing.T) {
 	// Setup test database
 	testDB := setupTestDB(t)
-	
+
 	// Create auth service
 	jwtSecret := []byte("test-secret")
 	t.Setenv("JWT_SECRET", string(jwtSecret))
