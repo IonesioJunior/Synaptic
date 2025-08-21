@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -235,13 +236,13 @@ func TestIntegrationReconnection(t *testing.T) {
 	defer client.Disconnect()
 
 	// Track connection events
-	connectCount := 0
+	var connectCount int32
 	reconnected := make(chan bool, 1)
 
 	client.OnConnect(func() {
-		connectCount++
-		t.Logf("Connection established (count: %d)", connectCount)
-		if connectCount > 1 {
+		count := atomic.AddInt32(&connectCount, 1)
+		t.Logf("Connection established (count: %d)", count)
+		if count > 1 {
 			// This is a reconnection
 			reconnected <- true
 		}
