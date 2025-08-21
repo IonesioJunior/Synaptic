@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
 	"websocketserver/auth"
 	"websocketserver/config"
 	"websocketserver/db"
@@ -32,8 +33,6 @@ func main() {
 		database.Close()
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
-
-	defer database.Close()
 
 	metrics.InitPersistence(database)
 
@@ -103,15 +102,23 @@ func main() {
 	log.Println("Shutting down servers...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
-	if err := httpsSrv.Shutdown(ctx); err != nil {
-		log.Fatalf("HTTPS server forced to shutdown: %v", err)
-	}
+	httpsErr := httpsSrv.Shutdown(ctx)
+	var httpErr error
 	if os.Getenv("DISABLE_HTTP_REDIRECT") != "true" {
-		if err := httpSrv.Shutdown(ctx); err != nil {
-			log.Printf("HTTP server shutdown error: %v", err)
-		}
+		httpErr = httpSrv.Shutdown(ctx)
+	}
+
+	cancel()
+
+	// Close database before checking errors
+	database.Close()
+
+	if httpsErr != nil {
+		log.Fatalf("HTTPS server forced to shutdown: %v", httpsErr)
+	}
+	if httpErr != nil {
+		log.Printf("HTTP server shutdown error: %v", httpErr)
 	}
 	log.Println("Servers shut down successfully")
 }

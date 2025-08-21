@@ -16,10 +16,11 @@ type User struct {
 // MessageType represents the type of message
 type MessageType string
 
+// Message type constants
 const (
-	MessageTypeDirect    MessageType = "direct"
-	MessageTypeBroadcast MessageType = "broadcast"
-	MessageTypeServer    MessageType = "server"
+	MessageTypeDirect    MessageType = "direct"    // Direct message to a specific user
+	MessageTypeBroadcast MessageType = "broadcast" // Broadcast message to all users
+	MessageTypeServer    MessageType = "server"    // Server-to-client message
 )
 
 // MessageHeader contains metadata about the message

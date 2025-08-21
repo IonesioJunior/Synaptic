@@ -9,12 +9,24 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
 	"websocketserver/auth"
 	"websocketserver/metrics"
 	"websocketserver/models"
 
 	"github.com/gorilla/websocket"
 )
+
+// Server represents the WebSocket server.
+type Server struct {
+	db             *sql.DB
+	authService    *auth.Service
+	clients        map[string]*Client     // mapping from user_id to client connection
+	RateLimiter    *RateLimiter           // rate limiter for message processing
+	serverHandlers *ServerMessageRegistry // registry for server message handlers
+	allowedOrigins []string               // list of allowed origins (empty = allow all)
+	mu             sync.RWMutex
+}
 
 // getUpgrader returns a WebSocket upgrader with proper origin checking.
 func (s *Server) getUpgrader() websocket.Upgrader {
@@ -39,17 +51,6 @@ func (s *Server) getUpgrader() websocket.Upgrader {
 			return false
 		},
 	}
-}
-
-// Server represents the WebSocket server.
-type Server struct {
-	db             *sql.DB
-	authService    *auth.Service
-	clients        map[string]*Client     // mapping from user_id to client connection
-	RateLimiter    *RateLimiter           // rate limiter for message processing
-	serverHandlers *ServerMessageRegistry // registry for server message handlers
-	allowedOrigins []string               // list of allowed origins (empty = allow all)
-	mu             sync.RWMutex
 }
 
 // NewServer creates a new WebSocket server instance.
@@ -354,12 +355,13 @@ func (c *Client) readPump() {
 
 			// Ensure MessageType is set (for compatibility, infer from To field if not set)
 			if msg.Header.MessageType == "" {
-				if msg.Header.To == "broadcast" {
+				switch msg.Header.To {
+				case "broadcast":
 					msg.Header.MessageType = models.MessageTypeBroadcast
 					msg.Header.IsBroadcast = true
-				} else if msg.Header.To == "server" {
+				case "server":
 					msg.Header.MessageType = models.MessageTypeServer
-				} else {
+				default:
 					msg.Header.MessageType = models.MessageTypeDirect
 				}
 			}

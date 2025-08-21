@@ -77,6 +77,8 @@ linters-settings:
       - name: error-naming
       - name: error-return
       - name: exported
+        arguments:
+          - disableStutteringCheck
       - name: indent-error-flow
       - name: package-comments
         disabled: true

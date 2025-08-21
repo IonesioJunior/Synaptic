@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
 	"websocketserver/auth"
 	"websocketserver/ws"
 
@@ -113,9 +114,8 @@ func TestSetupRoutes(t *testing.T) {
 				mock.ExpectQuery("SELECT EXISTS").
 					WithArgs("").
 					WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
-			} else if tt.path == "/auth/users/" {
-				// This will fail due to invalid path, no DB expectation needed
 			}
+			// Path "/auth/users/" will fail due to invalid path, no DB expectation needed
 
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			w := httptest.NewRecorder()
