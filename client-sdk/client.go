@@ -12,10 +12,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/genericwsserver/client-sdk/auth"
 	"github.com/genericwsserver/client-sdk/crypto"
 	"github.com/genericwsserver/client-sdk/types"
-	"github.com/gorilla/websocket"
 )
 
 const (
@@ -285,22 +286,20 @@ func (c *Client) SendMessage(to, content string, sign bool) error {
 
 	if to == "broadcast" {
 		msg.Header.IsBroadcast = true
-	} else {
+	} else if c.config.EncryptionPolicy != EncryptionDisabled {
 		// All direct messages should be encrypted (not broadcasts)
-		if c.config.EncryptionPolicy != EncryptionDisabled {
-			encrypted, err := c.encryptMessage(content, to)
-			if err != nil {
-				if c.config.EncryptionPolicy == EncryptionRequired {
-					return fmt.Errorf("encryption failed: %w", err)
-				}
-				// Fall back to unencrypted if policy is Preferred
-				c.logger.Printf("[WARN] Encryption failed, sending unencrypted: %v", err)
-			} else {
-				// Successfully encrypted
-				msg.Body.Content = encrypted.EncryptedContent
-				msg.Header.EncryptedKey = encrypted.EncryptedKey
-				msg.Header.EncryptionNonce = encrypted.Nonce
+		encrypted, err := c.encryptMessage(content, to)
+		if err != nil {
+			if c.config.EncryptionPolicy == EncryptionRequired {
+				return fmt.Errorf("encryption failed: %w", err)
 			}
+			// Fall back to unencrypted if policy is Preferred
+			c.logger.Printf("[WARN] Encryption failed, sending unencrypted: %v", err)
+		} else {
+			// Successfully encrypted
+			msg.Body.Content = encrypted.EncryptedContent
+			msg.Header.EncryptedKey = encrypted.EncryptedKey
+			msg.Header.EncryptionNonce = encrypted.Nonce
 		}
 	}
 
@@ -374,7 +373,9 @@ func (c *Client) GetMetrics() (sent, received uint64, reconnects, errors uint32)
 
 func (c *Client) GetUserInfo(userID string) (*types.User, error) {
 	if cached, ok := c.userCache.Load(userID); ok {
-		return cached.(*types.User), nil
+		if user, ok := cached.(*types.User); ok {
+			return user, nil
+		}
 	}
 
 	user, err := c.auth.GetUserInfo(userID)
@@ -412,7 +413,7 @@ type EncryptedMessage struct {
 }
 
 // encryptMessage encrypts a message for a specific recipient
-func (c *Client) encryptMessage(content string, recipientID string) (*EncryptedMessage, error) {
+func (c *Client) encryptMessage(content, recipientID string) (*EncryptedMessage, error) {
 	// Get recipient's X25519 public key
 	recipientX25519Key, err := c.auth.GetUserPublicKeyX25519(recipientID)
 	if err != nil {

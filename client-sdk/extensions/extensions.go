@@ -124,7 +124,11 @@ func (dmf *DefaultMessageFactory) CreateMessage(msgType string) (types.ExtendedM
 		return nil, fmt.Errorf("unknown message type: %s", msgType)
 	}
 
-	msg := reflect.New(t).Interface().(types.ExtendedMessage)
+	msgInterface := reflect.New(t).Interface()
+	msg, ok := msgInterface.(types.ExtendedMessage)
+	if !ok {
+		return nil, fmt.Errorf("registered type does not implement ExtendedMessage interface")
+	}
 	return msg, nil
 }
 

@@ -33,7 +33,7 @@ func GenerateNonce() ([]byte, error) {
 }
 
 // EncryptAESGCM encrypts data using AES-256-GCM
-func EncryptAESGCM(plaintext []byte, key []byte) (ciphertext []byte, nonce []byte, err error) {
+func EncryptAESGCM(plaintext, key []byte) (ciphertext, nonce []byte, err error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create cipher: %w", err)
@@ -54,7 +54,7 @@ func EncryptAESGCM(plaintext []byte, key []byte) (ciphertext []byte, nonce []byt
 }
 
 // DecryptAESGCM decrypts data using AES-256-GCM
-func DecryptAESGCM(ciphertext []byte, key []byte, nonce []byte) ([]byte, error) {
+func DecryptAESGCM(ciphertext, key, nonce []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
@@ -120,7 +120,7 @@ func DeriveX25519FromEd25519Seed(edPriv ed25519.PrivateKey) (x25519Pub, x25519Pr
 }
 
 // EncryptSymmetricKey encrypts an AES key using X25519 public key encryption
-func EncryptSymmetricKey(symmetricKey []byte, recipientX25519PublicKey []byte) ([]byte, error) {
+func EncryptSymmetricKey(symmetricKey, recipientX25519PublicKey []byte) ([]byte, error) {
 	if len(recipientX25519PublicKey) != 32 {
 		return nil, fmt.Errorf("invalid X25519 public key size")
 	}
@@ -154,7 +154,7 @@ func EncryptSymmetricKey(symmetricKey []byte, recipientX25519PublicKey []byte) (
 }
 
 // DecryptSymmetricKey decrypts an AES key using X25519 private key
-func DecryptSymmetricKey(encryptedData []byte, recipientX25519PrivateKey []byte) ([]byte, error) {
+func DecryptSymmetricKey(encryptedData, recipientX25519PrivateKey []byte) ([]byte, error) {
 	if len(encryptedData) < 56 {
 		return nil, fmt.Errorf("encrypted data too short: got %d bytes, need at least 56", len(encryptedData))
 	}

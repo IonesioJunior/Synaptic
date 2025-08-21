@@ -6,8 +6,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/genericwsserver/client-sdk/types"
 	"github.com/gorilla/websocket"
+
+	"github.com/genericwsserver/client-sdk/types"
 )
 
 func (c *Client) readPump() {
@@ -276,8 +277,8 @@ func (c *Client) setState(state types.ConnectionState) {
 	c.logDebug("State changed to: %s", state)
 }
 
-func (c *Client) compareAndSwapState(old, new types.ConnectionState) bool {
-	return c.state.CompareAndSwap(int32(old), int32(new))
+func (c *Client) compareAndSwapState(old, newState types.ConnectionState) bool {
+	return c.state.CompareAndSwap(int32(old), int32(newState))
 }
 
 func (c *Client) logDebug(format string, args ...interface{}) {

@@ -108,11 +108,12 @@ func (m *Message) Marshal() ([]byte, error) {
 
 type ConnectionState int
 
+// Connection state constants
 const (
-	StateDisconnected ConnectionState = iota
-	StateConnecting
-	StateConnected
-	StateReconnecting
+	StateDisconnected ConnectionState = iota // Client is not connected
+	StateConnecting                          // Client is establishing connection
+	StateConnected                           // Client is connected and ready
+	StateReconnecting                        // Client is attempting to reconnect
 )
 
 func (cs ConnectionState) String() string {

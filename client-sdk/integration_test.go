@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/genericwsserver/client-sdk/types"
 	"github.com/gorilla/websocket"
+
+	"github.com/genericwsserver/client-sdk/types"
 )
 
 // These tests require a running WebSocket server

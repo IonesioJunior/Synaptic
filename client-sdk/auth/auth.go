@@ -15,9 +15,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/genericwsserver/client-sdk/crypto"
 	"github.com/genericwsserver/client-sdk/types"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type PublicKeyCache struct {
@@ -74,7 +75,11 @@ func NewAuthManagerWithKeys(baseURL, userID, username string, privateKey ed25519
 		return nil, errors.New("invalid private key size")
 	}
 
-	publicKey := privateKey.Public().(ed25519.PublicKey)
+	publicKeyInterface := privateKey.Public()
+	publicKey, ok := publicKeyInterface.(ed25519.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("failed to get public key from private key")
+	}
 
 	// Derive X25519 keys from Ed25519 seed for consistent keys
 	x25519Pub, x25519Priv, err := crypto.DeriveX25519FromEd25519Seed(privateKey)
