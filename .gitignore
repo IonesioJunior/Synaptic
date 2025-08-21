@@ -7,6 +7,20 @@
 bin/
 releases/
 
+# Go build outputs (specific binaries)
+websocket_server/websocketserver
+websocket_server/websocket_server
+client-sdk/examples/simple/simple
+client-sdk/examples/advanced/advanced
+client-sdk/examples/simple-env/simple-env
+client-sdk/examples/server-messages/client/server-messages-client
+client-sdk/examples/server-messages/server/server-messages-server
+
+# Generic binary patterns (files without extensions in specific dirs)
+websocket_server/ws-server
+websocket_server/server
+client-sdk/client-sdk
+
 # Test binary, built with `go test -c`
 *.test
 
