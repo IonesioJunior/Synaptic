@@ -68,8 +68,12 @@ func (c *Client) readPump() {
 
 		// Debug: Log if message has encryption fields
 		if msg.Header.EncryptedKey != "" || msg.Header.EncryptionNonce != "" {
-			c.logDebug("Received encrypted message - Key: %s..., Nonce: %s",
-				msg.Header.EncryptedKey[:20], msg.Header.EncryptionNonce)
+			keyPreview := msg.Header.EncryptedKey
+			if len(keyPreview) > 20 {
+				keyPreview = keyPreview[:20] + "..."
+			}
+			c.logDebug("Received encrypted message - Key: %s, Nonce: %s",
+				keyPreview, msg.Header.EncryptionNonce)
 		}
 
 		// Decrypt the message if it's encrypted (has encrypted key)

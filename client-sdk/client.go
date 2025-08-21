@@ -267,6 +267,11 @@ func (c *Client) Disconnect() error {
 
 	c.setState(types.StateDisconnected)
 
+	// Call disconnect callback
+	if c.onDisconnect != nil {
+		go c.onDisconnect(nil)
+	}
+
 	c.wg.Wait()
 
 	return nil

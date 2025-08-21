@@ -129,6 +129,21 @@ func (dmf *DefaultMessageFactory) CreateMessage(msgType string) (types.ExtendedM
 	if !ok {
 		return nil, fmt.Errorf("registered type does not implement ExtendedMessage interface")
 	}
+
+	// Initialize the BaseExtendedMessage if it's nil
+	// This ensures SetBaseMessage won't panic
+	val := reflect.ValueOf(msg).Elem()
+	if baseField := val.FieldByName("BaseExtendedMessage"); baseField.IsValid() {
+		if baseField.Kind() == reflect.Ptr && baseField.IsNil() {
+			baseField.Set(reflect.New(baseField.Type().Elem()))
+			// Also initialize the Message field inside BaseExtendedMessage
+			baseMsg := baseField.Elem().FieldByName("Message")
+			if baseMsg.IsValid() && baseMsg.Kind() == reflect.Ptr && baseMsg.IsNil() {
+				baseMsg.Set(reflect.New(baseMsg.Type().Elem()))
+			}
+		}
+	}
+
 	return msg, nil
 }
 

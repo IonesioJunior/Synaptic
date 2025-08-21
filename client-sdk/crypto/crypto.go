@@ -59,7 +59,7 @@ func DecryptAESGCM(ciphertext, key, nonce []byte) ([]byte, error) {
 	if len(nonce) != 12 {
 		return nil, fmt.Errorf("invalid nonce size: expected 12, got %d", len(nonce))
 	}
-	
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
@@ -129,7 +129,7 @@ func EncryptSymmetricKey(symmetricKey, recipientX25519PublicKey []byte) ([]byte,
 	if len(symmetricKey) == 0 {
 		return nil, fmt.Errorf("symmetric key cannot be empty")
 	}
-	
+
 	if len(recipientX25519PublicKey) != 32 {
 		return nil, fmt.Errorf("invalid X25519 public key size")
 	}

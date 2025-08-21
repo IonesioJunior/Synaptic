@@ -1,0 +1,112 @@
+name: 'Setup Go with Act Compatibility'
+description: 'Setup Go with a workaround for act runner compatibility issues'
+inputs:
+  go-version:
+    description: 'The Go version to install'
+    required: true
+    default: '1.23'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check if running in act
+      id: check-act
+      shell: bash
+      run: |
+        if [ -n "$ACT" ]; then
+          echo "running-in-act=true" >> $GITHUB_OUTPUT
+          echo "Running in act environment"
+        else
+          echo "running-in-act=false" >> $GITHUB_OUTPUT
+          echo "Running in GitHub Actions"
+        fi
+    
+    - name: Setup Go (GitHub Actions)
+      if: steps.check-act.outputs.running-in-act == 'false'
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+    
+    - name: Setup Go (act workaround)
+      if: steps.check-act.outputs.running-in-act == 'true'
+      shell: bash
+      run: |
+        echo "Setting up Go ${{ inputs.go-version }} with act workaround"
+        
+        # Check if Go is already installed at the expected location
+        GO_VERSION="${{ inputs.go-version }}"
+        
+        # Handle version aliases
+        case "$GO_VERSION" in
+          "1.22") GO_FULL_VERSION="1.22.12" ;;
+          "1.23") GO_FULL_VERSION="1.23.12" ;;
+          "1.24") GO_FULL_VERSION="1.24.6" ;;
+          *) GO_FULL_VERSION="$GO_VERSION" ;;
+        esac
+        
+        GO_PATH="/opt/hostedtoolcache/go/${GO_FULL_VERSION}/x64"
+        
+        # Check if Go binary actually exists (not just the directory)
+        if [ -f "$GO_PATH/bin/go" ]; then
+          echo "Go ${GO_FULL_VERSION} binary found at $GO_PATH/bin/go"
+        else
+          echo "Go binary not found. Installing Go ${GO_FULL_VERSION}..."
+          
+          # Clean up any existing incomplete installation
+          if [ -d "$GO_PATH" ]; then
+            echo "Removing incomplete installation at $GO_PATH"
+            sudo rm -rf "$GO_PATH"
+          fi
+          
+          # Download and install Go
+          echo "Downloading Go ${GO_FULL_VERSION}..."
+          wget -q "https://go.dev/dl/go${GO_FULL_VERSION}.linux-amd64.tar.gz"
+          
+          # Create the directory structure
+          sudo mkdir -p "/opt/hostedtoolcache/go/${GO_FULL_VERSION}"
+          
+          # Extract Go directly to the x64 directory
+          echo "Extracting Go..."
+          sudo tar -C "/opt/hostedtoolcache/go/${GO_FULL_VERSION}" -xzf "go${GO_FULL_VERSION}.linux-amd64.tar.gz"
+          
+          # Rename 'go' to 'x64' to match the expected structure
+          if [ -d "/opt/hostedtoolcache/go/${GO_FULL_VERSION}/go" ]; then
+            sudo mv "/opt/hostedtoolcache/go/${GO_FULL_VERSION}/go" "$GO_PATH"
+          fi
+          
+          # Clean up
+          rm "go${GO_FULL_VERSION}.linux-amd64.tar.gz"
+          
+          echo "Go installation completed"
+        fi
+        
+        # Verify Go binary exists after installation
+        if [ ! -f "$GO_PATH/bin/go" ]; then
+          echo "ERROR: Go binary still not found after installation!"
+          echo "Contents of /opt/hostedtoolcache/go/${GO_FULL_VERSION}:"
+          ls -la "/opt/hostedtoolcache/go/${GO_FULL_VERSION}/" || echo "Directory does not exist"
+          exit 1
+        fi
+        
+        # Create symlinks for act (ensures Go is available in all steps)
+        echo "Creating symlinks for Go binaries..."
+        sudo ln -sf "$GO_PATH/bin/go" /usr/local/bin/go
+        sudo ln -sf "$GO_PATH/bin/gofmt" /usr/local/bin/gofmt
+        
+        # Add to PATH for GitHub Actions compatibility
+        echo "$GO_PATH/bin" >> $GITHUB_PATH
+        echo "PATH=$GO_PATH/bin:$PATH" >> $GITHUB_ENV
+        
+        # Verify installation
+        echo "Verifying Go installation:"
+        /usr/local/bin/go version
+        echo "Go location: $(which go)"
+        
+        # Set environment variables
+        echo "GOPATH=$HOME/go" >> $GITHUB_ENV
+        echo "$HOME/go/bin" >> $GITHUB_PATH
+        
+        # Create go directories
+        mkdir -p "$HOME/go/bin"
+        mkdir -p "$HOME/go/pkg"
+        mkdir -p "$HOME/go/src"

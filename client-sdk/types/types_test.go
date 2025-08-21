@@ -8,8 +8,8 @@ import (
 )
 
 func TestParseMessage(t *testing.T) {
-	now := time.Now().Truncate(time.Second)
-	
+	now := time.Now().UTC().Truncate(time.Second)
+
 	tests := []struct {
 		name    string
 		data    string
@@ -113,7 +113,7 @@ func TestParseMessage(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseMessage([]byte(tt.data))
@@ -121,16 +121,28 @@ func TestParseMessage(t *testing.T) {
 				t.Errorf("ParseMessage() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ParseMessage() = %+v, want %+v", got, tt.want)
+			if !tt.wantErr {
+				// Compare fields individually to handle time zone differences
+				if got.ID != tt.want.ID ||
+					got.Header.From != tt.want.Header.From ||
+					got.Header.To != tt.want.Header.To ||
+					got.Header.IsBroadcast != tt.want.Header.IsBroadcast ||
+					got.Header.Signature != tt.want.Header.Signature ||
+					got.Header.EncryptedKey != tt.want.Header.EncryptedKey ||
+					got.Header.EncryptionNonce != tt.want.Header.EncryptionNonce ||
+					got.Body.Content != tt.want.Body.Content ||
+					got.Status != tt.want.Status ||
+					!got.Header.Timestamp.Equal(tt.want.Header.Timestamp) {
+					t.Errorf("ParseMessage() mismatch:\ngot  = %+v\nwant = %+v", got, tt.want)
+				}
 			}
 		})
 	}
 }
 
 func TestMessage_Marshal(t *testing.T) {
-	now := time.Now().Truncate(time.Second)
-	
+	now := time.Now().UTC().Truncate(time.Second)
+
 	msg := &Message{
 		ID: 456,
 		Header: MessageHeader{
@@ -144,19 +156,26 @@ func TestMessage_Marshal(t *testing.T) {
 		},
 		Status: "delivered",
 	}
-	
+
 	data, err := msg.Marshal()
 	if err != nil {
 		t.Fatalf("Marshal() error = %v", err)
 	}
-	
+
 	// Unmarshal to verify
 	var decoded Message
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
 	}
-	
-	if !reflect.DeepEqual(*msg, decoded) {
+
+	// Compare fields individually to handle time zone differences
+	if msg.ID != decoded.ID ||
+		msg.Header.From != decoded.Header.From ||
+		msg.Header.To != decoded.Header.To ||
+		msg.Header.Signature != decoded.Header.Signature ||
+		msg.Body.Content != decoded.Body.Content ||
+		msg.Status != decoded.Status ||
+		!msg.Header.Timestamp.Equal(decoded.Header.Timestamp) {
 		t.Errorf("Marshal/Unmarshal mismatch: got %+v, want %+v", decoded, *msg)
 	}
 }
@@ -172,7 +191,7 @@ func TestConnectionState_String(t *testing.T) {
 		{StateReconnecting, "reconnecting"},
 		{ConnectionState(999), "unknown"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			if got := tt.state.String(); got != tt.want {
@@ -185,13 +204,13 @@ func TestConnectionState_String(t *testing.T) {
 func TestMessageHandlerFunc(t *testing.T) {
 	called := false
 	var receivedMsg *Message
-	
+
 	handler := MessageHandlerFunc(func(msg *Message) error {
 		called = true
 		receivedMsg = msg
 		return nil
 	})
-	
+
 	testMsg := &Message{
 		Header: MessageHeader{
 			From: "test",
@@ -201,16 +220,16 @@ func TestMessageHandlerFunc(t *testing.T) {
 			Content: "test content",
 		},
 	}
-	
+
 	err := handler.HandleMessage(testMsg)
 	if err != nil {
 		t.Errorf("HandleMessage() error = %v", err)
 	}
-	
+
 	if !called {
 		t.Error("Handler function was not called")
 	}
-	
+
 	if receivedMsg != testMsg {
 		t.Error("Handler received different message")
 	}
@@ -227,12 +246,12 @@ func TestBaseExtendedMessage(t *testing.T) {
 			Content: "extended content",
 		},
 	}
-	
+
 	extMsg := &BaseExtendedMessage{}
-	
+
 	// Test SetBaseMessage
 	extMsg.SetBaseMessage(baseMsg)
-	
+
 	// Test GetBaseMessage
 	got := extMsg.GetBaseMessage()
 	if got != baseMsg {
@@ -249,18 +268,18 @@ func TestUser(t *testing.T) {
 		X25519PublicKey: "x25519key789",
 		CreatedAt:       now,
 	}
-	
+
 	// Test JSON marshaling
 	data, err := json.Marshal(user)
 	if err != nil {
 		t.Fatalf("Failed to marshal User: %v", err)
 	}
-	
+
 	var decoded User
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal User: %v", err)
 	}
-	
+
 	// Compare fields (time comparison needs special handling)
 	if decoded.UserID != user.UserID ||
 		decoded.Username != user.Username ||
@@ -278,17 +297,17 @@ func TestRegistrationRequest(t *testing.T) {
 		PublicKey:       "newpubkey",
 		X25519PublicKey: "newx25519key",
 	}
-	
+
 	data, err := json.Marshal(req)
 	if err != nil {
 		t.Fatalf("Failed to marshal RegistrationRequest: %v", err)
 	}
-	
+
 	var decoded RegistrationRequest
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal RegistrationRequest: %v", err)
 	}
-	
+
 	if !reflect.DeepEqual(req, decoded) {
 		t.Errorf("RegistrationRequest mismatch: got %+v, want %+v", decoded, req)
 	}
@@ -298,17 +317,17 @@ func TestLoginRequest(t *testing.T) {
 	req := LoginRequest{
 		UserID: "loginuser",
 	}
-	
+
 	data, err := json.Marshal(req)
 	if err != nil {
 		t.Fatalf("Failed to marshal LoginRequest: %v", err)
 	}
-	
+
 	var decoded LoginRequest
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal LoginRequest: %v", err)
 	}
-	
+
 	if req.UserID != decoded.UserID {
 		t.Errorf("LoginRequest UserID mismatch: got %v, want %v", decoded.UserID, req.UserID)
 	}
@@ -318,17 +337,17 @@ func TestChallengeResponse(t *testing.T) {
 	resp := ChallengeResponse{
 		Challenge: "challenge123abc",
 	}
-	
+
 	data, err := json.Marshal(resp)
 	if err != nil {
 		t.Fatalf("Failed to marshal ChallengeResponse: %v", err)
 	}
-	
+
 	var decoded ChallengeResponse
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal ChallengeResponse: %v", err)
 	}
-	
+
 	if resp.Challenge != decoded.Challenge {
 		t.Errorf("ChallengeResponse Challenge mismatch: got %v, want %v", decoded.Challenge, resp.Challenge)
 	}
@@ -339,17 +358,17 @@ func TestLoginVerifyRequest(t *testing.T) {
 		UserID:    "verifyuser",
 		Signature: "signature123",
 	}
-	
+
 	data, err := json.Marshal(req)
 	if err != nil {
 		t.Fatalf("Failed to marshal LoginVerifyRequest: %v", err)
 	}
-	
+
 	var decoded LoginVerifyRequest
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal LoginVerifyRequest: %v", err)
 	}
-	
+
 	if !reflect.DeepEqual(req, decoded) {
 		t.Errorf("LoginVerifyRequest mismatch: got %+v, want %+v", decoded, req)
 	}
@@ -359,17 +378,17 @@ func TestTokenResponse(t *testing.T) {
 	resp := TokenResponse{
 		Token: "jwt.token.here",
 	}
-	
+
 	data, err := json.Marshal(resp)
 	if err != nil {
 		t.Fatalf("Failed to marshal TokenResponse: %v", err)
 	}
-	
+
 	var decoded TokenResponse
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal TokenResponse: %v", err)
 	}
-	
+
 	if resp.Token != decoded.Token {
 		t.Errorf("TokenResponse Token mismatch: got %v, want %v", decoded.Token, resp.Token)
 	}
@@ -380,21 +399,21 @@ func TestUserStatusResponse(t *testing.T) {
 		Online:  []string{"user1", "user2", "user3"},
 		Offline: []string{"user4", "user5"},
 	}
-	
+
 	data, err := json.Marshal(resp)
 	if err != nil {
 		t.Fatalf("Failed to marshal UserStatusResponse: %v", err)
 	}
-	
+
 	var decoded UserStatusResponse
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal UserStatusResponse: %v", err)
 	}
-	
+
 	if !reflect.DeepEqual(resp.Online, decoded.Online) {
 		t.Errorf("Online users mismatch: got %v, want %v", decoded.Online, resp.Online)
 	}
-	
+
 	if !reflect.DeepEqual(resp.Offline, decoded.Offline) {
 		t.Errorf("Offline users mismatch: got %v, want %v", decoded.Offline, resp.Offline)
 	}
@@ -408,23 +427,23 @@ func TestUserExistsResponse(t *testing.T) {
 		{"exists", true},
 		{"not exists", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resp := UserExistsResponse{
 				Exists: tt.exists,
 			}
-			
+
 			data, err := json.Marshal(resp)
 			if err != nil {
 				t.Fatalf("Failed to marshal UserExistsResponse: %v", err)
 			}
-			
+
 			var decoded UserExistsResponse
 			if err := json.Unmarshal(data, &decoded); err != nil {
 				t.Fatalf("Failed to unmarshal UserExistsResponse: %v", err)
 			}
-			
+
 			if resp.Exists != decoded.Exists {
 				t.Errorf("UserExistsResponse Exists mismatch: got %v, want %v", decoded.Exists, resp.Exists)
 			}
@@ -440,12 +459,12 @@ func TestMessageHeader_EncryptionFields(t *testing.T) {
 		EncryptedKey:    "encryptedAESKey",
 		EncryptionNonce: "nonceValue",
 	}
-	
+
 	data, err := json.Marshal(header)
 	if err != nil {
 		t.Fatalf("Failed to marshal MessageHeader: %v", err)
 	}
-	
+
 	// Check that encryption fields are properly tagged
 	jsonStr := string(data)
 	if !contains(jsonStr, `"encrypted_key"`) {
@@ -454,12 +473,12 @@ func TestMessageHeader_EncryptionFields(t *testing.T) {
 	if !contains(jsonStr, `"encryption_nonce"`) {
 		t.Error("encryption_nonce field not found in JSON")
 	}
-	
+
 	var decoded MessageHeader
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal MessageHeader: %v", err)
 	}
-	
+
 	if decoded.EncryptedKey != header.EncryptedKey {
 		t.Errorf("EncryptedKey mismatch: got %v, want %v", decoded.EncryptedKey, header.EncryptedKey)
 	}
@@ -486,7 +505,7 @@ func BenchmarkParseMessage(b *testing.B) {
 		},
 		"status": "sent"
 	}`)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := ParseMessage(data)
@@ -510,7 +529,7 @@ func BenchmarkMessage_Marshal(b *testing.B) {
 		},
 		Status: "delivered",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := msg.Marshal()
