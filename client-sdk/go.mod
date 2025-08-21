@@ -1,4 +1,4 @@
-module github.com/genericwsserver/client-sdk
+module github.com/IonesioJunior/Synaptic/client-sdk
 
 go 1.23.0
 

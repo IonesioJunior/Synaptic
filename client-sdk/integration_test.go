@@ -13,7 +13,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 // These tests require a running WebSocket server

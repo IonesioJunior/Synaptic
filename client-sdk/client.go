@@ -14,9 +14,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/genericwsserver/client-sdk/auth"
-	"github.com/genericwsserver/client-sdk/crypto"
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/auth"
+	"github.com/IonesioJunior/Synaptic/client-sdk/crypto"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 const (

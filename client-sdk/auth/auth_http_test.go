@@ -13,7 +13,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 // Mock HTTP server for testing

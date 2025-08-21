@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	client "github.com/genericwsserver/client-sdk"
-	"github.com/genericwsserver/client-sdk/extensions"
-	"github.com/genericwsserver/client-sdk/types"
+	client "github.com/IonesioJunior/Synaptic/client-sdk"
+	"github.com/IonesioJunior/Synaptic/client-sdk/extensions"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 // Custom message types for a game application

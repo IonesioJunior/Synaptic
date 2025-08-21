@@ -17,8 +17,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/genericwsserver/client-sdk/crypto"
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/crypto"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 type PublicKeyCache struct {

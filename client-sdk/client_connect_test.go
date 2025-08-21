@@ -14,8 +14,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 
-	"github.com/genericwsserver/client-sdk/auth"
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/auth"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 // Mock WebSocket server for testing

@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 type MessageFactory interface {

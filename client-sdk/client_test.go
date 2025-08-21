@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 func TestClientCreation(t *testing.T) {

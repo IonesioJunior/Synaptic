@@ -13,8 +13,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/genericwsserver/client-sdk/auth"
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/auth"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 func TestClient_Connect_WithEncryption(t *testing.T) {

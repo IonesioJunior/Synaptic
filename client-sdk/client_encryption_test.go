@@ -4,8 +4,8 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/genericwsserver/client-sdk/crypto"
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/crypto"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 func TestClient_EncryptMessage(t *testing.T) {

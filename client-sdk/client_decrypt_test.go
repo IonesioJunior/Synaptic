@@ -6,9 +6,9 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/genericwsserver/client-sdk/auth"
-	"github.com/genericwsserver/client-sdk/crypto"
-	"github.com/genericwsserver/client-sdk/types"
+	"github.com/IonesioJunior/Synaptic/client-sdk/auth"
+	"github.com/IonesioJunior/Synaptic/client-sdk/crypto"
+	"github.com/IonesioJunior/Synaptic/client-sdk/types"
 )
 
 func TestClient_DecryptMessage_Comprehensive(t *testing.T) {
