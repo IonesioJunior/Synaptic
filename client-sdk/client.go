@@ -457,6 +457,11 @@ func (c *Client) decryptMessage(msg *types.Message) (string, error) {
 		return msg.Body.Content, nil
 	}
 
+	// Check if auth manager is available
+	if c.auth == nil {
+		return "", fmt.Errorf("auth manager not initialized")
+	}
+
 	// Get our X25519 private key
 	x25519PrivKey, err := c.auth.GetOwnX25519PrivateKey()
 	if err != nil {
