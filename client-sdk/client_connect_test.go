@@ -674,6 +674,9 @@ func TestClient_ErrorChannel(t *testing.T) {
 	data, _ := json.Marshal(testMsg)
 	server.SendToClients(data)
 
+	// Give time for the message to be processed asynchronously
+	time.Sleep(100 * time.Millisecond)
+
 	// Wait for error
 	select {
 	case err := <-errorChan:
