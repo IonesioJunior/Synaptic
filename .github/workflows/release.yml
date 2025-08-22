@@ -105,6 +105,13 @@ jobs:
           # Windows ARM64 builds can be unreliable
           - goos: windows
             goarch: arm64
+          # Cross-compilation with CGO is complex, skip non-native builds for websocket_server
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
             
     steps:
     - name: Checkout code
@@ -132,17 +139,34 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y upx-ucl
         
+        # Install cross-compilation tools for ARM64 if needed
+        if [ "${{ matrix.goarch }}" = "arm64" ]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        fi
+        
     - name: Build WebSocket Server
       working-directory: ./websocket_server
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
-        CGO_ENABLED: 1
       run: |
         # Set binary name based on OS
         BINARY_NAME="websocket_server"
         if [ "$GOOS" = "windows" ]; then
           BINARY_NAME="websocket_server.exe"
+        fi
+        
+        # Configure cross-compilation for ARM64
+        if [ "$GOARCH" = "arm64" ] && [ "$GOOS" = "linux" ]; then
+          export CC=aarch64-linux-gnu-gcc
+          export CXX=aarch64-linux-gnu-g++
+          export CGO_ENABLED=1
+        elif [ "$GOOS" = "linux" ] && [ "$GOARCH" = "amd64" ]; then
+          # Native compilation for Linux AMD64
+          export CGO_ENABLED=1
+        else
+          # Disable CGO for other platforms (will use pure Go SQLite)
+          export CGO_ENABLED=0
         fi
         
         # Build with optimizations
