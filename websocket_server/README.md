@@ -40,6 +40,9 @@ cd websocket-server/websocket_server
 # Install dependencies
 go mod download
 
+# Generate SSL certificates (required for HTTPS)
+./generate_certs.sh
+
 # Build the server
 go build -o websocket-server .
 
@@ -57,6 +60,23 @@ docker compose up --build
 docker build -t websocket-server .
 docker run -p 443:443 -p 80:80 websocket-server
 ```
+
+## 🔐 SSL Certificates
+
+The server requires SSL certificates for HTTPS. These are NOT included in the repository for security reasons.
+
+### Development
+Run the included script to generate self-signed certificates:
+```bash
+./generate_certs.sh
+```
+
+### Production
+Use proper certificates from a Certificate Authority (CA) like Let's Encrypt. Place them as:
+- `server.crt` - Certificate file
+- `server.key` - Private key file
+
+**Security Note:** Never commit certificates to version control. They're already in `.gitignore`.
 
 ## ⚙️ Configuration
 

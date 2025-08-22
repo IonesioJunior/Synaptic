@@ -10,6 +10,7 @@ import (
 	"log"
 	"time"
 
+	"websocketserver/auth"
 	"websocketserver/models"
 )
 
@@ -192,4 +193,26 @@ func (s *Server) sendServerError(client *Client, originalMsg models.Message, err
 // RegisterServerHandler allows external code to register custom server message handlers
 func (s *Server) RegisterServerHandler(command string, handler ServerMessageHandler) error {
 	return s.serverHandlers.Register(command, handler)
+}
+
+// GetDB returns the database connection for use by custom handlers
+func (s *Server) GetDB() *sql.DB {
+	return s.db
+}
+
+// GetAuthService returns the auth service for use by custom handlers
+func (s *Server) GetAuthService() *auth.Service {
+	return s.authService
+}
+
+// GetConnectedUsers returns a list of currently connected user IDs
+func (s *Server) GetConnectedUsers() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	users := make([]string, 0, len(s.clients))
+	for userID := range s.clients {
+		users = append(users, userID)
+	}
+	return users
 }

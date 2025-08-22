@@ -1,0 +1,38 @@
+package customhandlers
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"websocketserver/ws"
+)
+
+type ExampleHandler struct{}
+
+func (h *ExampleHandler) Handle(ctx context.Context, server *ws.Server, sender string, params json.RawMessage) (interface{}, error) {
+	var input map[string]interface{}
+	if len(params) > 0 {
+		if err := json.Unmarshal(params, &input); err != nil {
+			return nil, fmt.Errorf("invalid parameters: %w", err)
+		}
+	}
+	
+	response := map[string]interface{}{
+		"message":   "Hello from custom example handler!",
+		"sender":    sender,
+		"input":     input,
+		"timestamp": time.Now().Unix(),
+	}
+	
+	return response, nil
+}
+
+func init() {
+	Register(
+		"example_custom",
+		func() ws.ServerMessageHandler { return &ExampleHandler{} },
+		"Example custom handler that echoes input with greeting",
+	)
+}

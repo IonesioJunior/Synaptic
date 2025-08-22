@@ -1,0 +1,63 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+/websocket-server
+/test_server
+/server
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# SSL Certificates - NEVER commit these!
+*.crt
+*.key
+*.pem
+*.p12
+*.pfx
+server.crt
+server.key
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Log files
+*.log
+logs/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+dist/
+build/

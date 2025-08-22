@@ -12,6 +12,7 @@ import (
 
 	"websocketserver/auth"
 	"websocketserver/config"
+	"websocketserver/customhandlers"
 	"websocketserver/db"
 	"websocketserver/handlers"
 	"websocketserver/metrics"
@@ -47,6 +48,12 @@ func main() {
 		cfg.MessageBurstLimit,
 		cfg.AllowedOrigins,
 	)
+
+	// Register all custom handlers from the customhandlers directory
+	if err := customhandlers.RegisterAll(wsServer); err != nil {
+		database.Close()
+		log.Fatalf("Failed to register custom handlers: %v", err)
+	}
 
 	// Setup HTTPS routes using the multiplexer.
 	mux := http.NewServeMux()

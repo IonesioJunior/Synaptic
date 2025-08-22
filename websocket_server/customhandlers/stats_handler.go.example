@@ -1,0 +1,55 @@
+package custom_handlers
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"time"
+	"websocketserver/ws"
+)
+
+type StatsHandler struct{}
+
+func (h *StatsHandler) Handle(ctx context.Context, server *ws.Server, sender string, params json.RawMessage) (interface{}, error) {
+	db := server.GetDB()
+	
+	// Count total registered users
+	var userCount int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&userCount)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to count users: %w", err)
+	}
+	
+	// Count total messages
+	var messageCount int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM messages").Scan(&messageCount)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to count messages: %w", err)
+	}
+	
+	// Get connected users
+	connectedUsers := server.GetConnectedUsers()
+	
+	// Build response
+	response := map[string]interface{}{
+		"statistics": map[string]interface{}{
+			"total_users":      userCount,
+			"connected_users":  len(connectedUsers),
+			"total_messages":   messageCount,
+			"server_time":      time.Now().Format(time.RFC3339),
+			"requester":        sender,
+		},
+		"status": "success",
+	}
+	
+	return response, nil
+}
+
+func init() {
+	Register(
+		"server_stats",
+		func() ws.ServerMessageHandler { return &StatsHandler{} },
+		"Get server statistics including user counts and message counts",
+	)
+}
